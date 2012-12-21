@@ -1,0 +1,22 @@
+SESComponents
+-------------
+
+Shared component package used by Strathclyde Electrophysiology Software application programs.
+
+The component package SESCOMPONENT must be installed on the Delphi V7 IDE toolbar before building/editing applications.
+
+To install the package:
+
+1) Import the SESComponents repository into the folder <your Delphi projects folder>\Components"
+2) Select File/Open Project
+3) Select Files of Type "*.dpk"
+4) Select the "Components" Folder
+5) Select "SESCOMPONENT"
+6) Click the Install button
+7) Select Tools/Environment Options
+8) Select the "Library" panel
+9) Click "..." at the right of Library Path
+10) Add "$<your Delphi projects folder>\Components" to the library 
+11) Add "$<your Delphi projects folder>\Components\graphicex" to the library 
+
+Note. SESCOMPONENTS includes a copy of the GraphicEX library produced by  Mike Lischke (http://www.lischke-online.de/index.php/libs/graphicex-library)
