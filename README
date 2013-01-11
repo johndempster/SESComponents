@@ -16,7 +16,6 @@ To install the package:
 7) Select Tools/Environment Options
 8) Select the "Library" panel
 9) Click "..." at the right of Library Path
-10) Add "$<your Delphi projects folder>\Components" to the library 
-11) Add "$<your Delphi projects folder>\Components\graphicex" to the library 
+10) Add "$<your Delphi projects folder>\SESComponents" to the library 
 
 Note. SESCOMPONENTS includes a copy of the GraphicEX library produced by  Mike Lischke (http://www.lischke-online.de/index.php/libs/graphicex-library)
