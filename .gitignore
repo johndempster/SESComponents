@@ -1,0 +1,19 @@
+*.arm
+*.cmd
+*.gxc
+*.arn
+*.zip
+*.dcu
+*.tmp
+*.~*~
+*.local
+*.identcache
+__history
+*.drc
+*.map
+*.exe
+*.dll
+/1401 commands/
+/Digidata 1200 Support (Win 2000)/
+/Digidata 1200 Support (Win 9x)/
+/temp/
