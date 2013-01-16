@@ -1,0 +1,18 @@
+1) Create a folder called "Components" inside "Program Files\Borland\Delphi7"
+2) Extract the contents of the components.zip archive into the components folder
+
+3) Select File/Open Project
+4) Select Files of Type "*.dpk"
+5) Select the "Components" Folder
+6) Select "SESCOMPONENT"
+7) Click the Install button
+
+8) Select Tools/Environment Options
+9) Select the "Library" panel
+10) Click "..." at the right of Library Path
+11) Add "$(Delphi)\Components" to the library 
+12) Add "$(Delphi)\Components\graphicex" to the library 
+
+
+
+

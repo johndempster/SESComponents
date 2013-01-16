@@ -828,8 +828,6 @@ begin
     // Default settings for CED Power 1401 DIGTIM count shift
     FCEDPower1401DIGTIMCountShift := 1 ;
 
-
-
      // Load settings
      SettingsFileName := ExtractFilePath(ParamStr(0)) + 'lab interface settings.xml' ;
      if FileExists( SettingsFileName ) then LoadFromXMLFile( SettingsFileName ) ;
@@ -2012,6 +2010,7 @@ function TSESLabIO.ReadADC(
   ---------------------------- }
 begin
 
+     Result := 0 ;
      if not FLabInterfaceAvailable then Exit ;
 
      case FLabInterfaceType of
@@ -3876,6 +3875,7 @@ function TSESLabIO.GetDBSWirelessChannel : Integer ;
 begin
      case FLabInterfaceType of
        WirelessEEG : Result := WirelessEEG_GetWirelessChannel ;
+       else Result := 0  ;
        end ;
     end ;
 
