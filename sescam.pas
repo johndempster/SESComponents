@@ -57,7 +57,7 @@ interface
 
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, itex, imaq1394,
-  pixelflyunit, SensiCamUnit, AndorUnit, HamDCAMUnit, Math,
+  pixelflyunit, SensiCamUnit, HamDCAMUnit, Math, AndorUnit, 
   QCAMUnit, pvcam, imaqunit, nimaqdxunit, strutils, DTOpenLayersUnit ;
 
 const
