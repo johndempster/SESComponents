@@ -44,7 +44,6 @@ unit NidaqMXUnit;
 // 14.10.11 NIMX_GetLabInterfaceInfo now returns DeviceList containing list
 //          available NI devices
 // 17.10.11 // No error check on analog writes to avoid warning of out of range data
-// 28.01.13 DAQmx_Val_PseudoDiff now only used with NI-611X boards (not NI-61XX)
 
 interface
 
@@ -3097,7 +3096,7 @@ function NIMX_GetADCInputModeCode( ADCInputMode : Integer ) : Integer ;
 begin
      case ADCInputMode of
         imDifferential,imBNC2110 : begin
-            if ANSIContainsText(FBoardModel,'611') then Result := DAQmx_Val_PseudoDiff
+            if ANSIContainsText(FBoardModel,'61') then Result := DAQmx_Val_PseudoDiff
                                                   else Result := DAQmx_Val_Diff ;
             end ;
         imSingleEndedRSE : Result := DAQmx_Val_RSE ;

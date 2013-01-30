@@ -1,0 +1,72 @@
+     if NumBytesRead > 0 then begin
+        for i := 0 to NumBytesRead-1 do begin
+            Inc(packet.NumBytesReceived) ;
+            //if i < 16 then s := s + format('%x ',[rBuf[i]]);
+            //if i = 16 then outputdebugstring(pchar(s));
+            if packet.GetStimFrequencyStatusByte then begin
+               iMult := rBuf[i] shr 6 ;
+               packet.PulseFrequency := (rBuf[i] and $3F)*FrequencyMultiplier[iMult] ;
+               packet.GetStimFrequencyStatusByte := False ;
+               packet.GetStimPulseWidthStatusByte := True ;
+               end
+            else if packet.GetStimPulseWidthStatusByte then begin
+               iMult := rBuf[i] shr 6 ;
+               packet.PulseWidth := (rBuf[i] and $3F)*PulseWidthMultiplier[iMult] ;
+               packet.GetStimPulseWidthStatusByte := False ;
+               end
+            else if (rBuf[i] and $80) <> 0 then begin
+               // ADC Channel #
+               Packet.ADCChan := (rBuf[i] shr 5) and $3 ;
+               // MSB
+               packet.ADCValue[Packet.ADCChan] := (rBuf[i] and $1f) shl 11 ;
+               Packet.NextBit := 1 ;
+               // Get DBS stimulus state
+               if (rBuf[i] and $1) <> 0 then packet.StimulusOn := True
+                                        else packet.StimulusOn := False ;
+               // Get wireless frequency channel
+               WirelessChannel := (rBuf[i] and $2) shr 1 ;
+               end
+            else if Packet.NextBit = 1 then begin
+               // Middle byte
+               packet.ADCValue[Packet.ADCChan] := packet.ADCValue[Packet.ADCChan]
+                                                  or (rBuf[i] shl 4) ;
+               Packet.NextBit := 0 ;
+               end
+            else if Packet.NextBit = 0 then begin
+               // LSB
+               packet.ADCValue[Packet.ADCChan] := packet.ADCValue[Packet.ADCChan]
+                                                  or (rBuf[i] shr 3) ;
+               // End of packet
+               Packet.NextBit := -1 ;
+
+               //s := format('Ch.%d=%d',[Packet.ADCChan,packet.ADCValue[Packet.ADCChan]]) ;
+               //outputdebugstring(PChar(s)) ;
+
+               if Packet.ADCChan = (FNumADCChannels-1) then begin
+                  // Write required number channels to output buffer
+                  for ch := 0 to FNumADCChannels-1 do begin
+                      if OutPointer > FADCBufferLimit then break ;
+                      if ch < Packet.NumADCChannels then begin
+                         OutBuf[OutPointer] := packet.ADCValue[ch] - $8000 ;
+                         end
+                      else OutBuf[OutPointer] := 0 ;
+
+                      Inc(OutPointer) ;
+                      if CyclicADCBuffer and (OutPointer > FADCBufferLimit) then OutPointer := 0 ;
+                      end ;
+
+                  Inc(Packet.NumChannelSets) ;
+                  end ;
+
+               //if Packet.ADCChan = 3 then packet.GetStimFrequencyStatusByte := True
+              //                       else packet.GetStimFrequencyStatusByte := False ;
+
+               if Packet.ADCChan = 3 then begin
+            //      s := format('Frame size %d',
+            //           [packet.NumBytesReceived-packet.EndofFrame]) ;
+            //      outputdebugstring(pchar(s));
+            //      packet.EndofFrame := packet.NumBytesReceived ;
+                  end ;
+               end ;
+            end ;
+        end ;
