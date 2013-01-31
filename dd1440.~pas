@@ -756,8 +756,8 @@ begin
     Protocol.bDOEnable := True ;
 
     // Set analog and digital outputs to zero
-    GetMem( DACBuf, DeviceInfo[0].OutputBufferSamples*4) ;
-    GetMem( OutValues, DeviceInfo[0].OutputBufferSamples*4) ;
+    GetMem( DACBuf, DeviceInfo[0].OutputBufferSamples*2) ;
+    GetMem( OutValues, DeviceInfo[0].OutputBufferSamples*2) ;
     NumOutChannels :=  DD1400_MAX_AO_CHANNELS + 1 ;
     DigCh := DD1400_MAX_AO_CHANNELS ;
     NumOutPoints := DeviceInfo[0].OutputBufferSamples div NumOutChannels ;
@@ -824,9 +824,9 @@ begin
     for i := 0 to NumOutPoints-1 do begin
         iTo := i*NumOutChannels ;
         for ch := 0 to DD1400_MAX_AO_CHANNELS-1 do begin
-            OutValues^[iTo+ch] := 0;//DACDefaultValue[ch]
+     //       OutValues^[iTo+ch] := DACDefaultValue[ch]
             end ;
-        OutValues^[iTo+DigCh] := DIGDefaultValue ;
+  //      OutValues^[iTo+DigCh] := DIGDefaultValue ;
         end ;
 
     // Circular transfer buffer
@@ -1068,8 +1068,8 @@ begin
     { Stop any acquisition in progress }
     //if DD1440_IsAcquiring then DD1440_StopAcquisition ;
     FreeMem(OutValues) ;
-    NumOutPoints := NumDACPoints ;
-    GetMem( OutValues, NumOutPoints*NumOutChannels*2 ) ;
+    NumOutPoints := NumDACPoints*NumOutChannels ;
+    GetMem( OutValues, NumOutPoints*2 ) ;
     // Copy D/A & digital values into internal output buffer
     DigCh := NumOutChannels - 1 ;
     for i := 0 to NumDACPoints-1 do begin

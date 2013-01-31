@@ -669,7 +669,7 @@ function DD132X_ADCToMemory(
   -----------------------------}
 
 var
-   i : Word ;
+   i,j : Word ;
    ch,iBuf,NumBufs : Integer ;
 begin
      Result := False ;

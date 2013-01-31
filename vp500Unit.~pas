@@ -731,7 +731,6 @@ begin
     ShortLevelLimit := 4*dt ;
     TSum := 0.0 ;
     NumShortLevels := 0 ;
-    iStartLev := 0 ;
     for iLev := 0 to NumLevels-1 do begin
 
         if iStim > High(VP500Stim.StimTab) then Break ;
@@ -906,6 +905,8 @@ function VP500_ReadADC(
 // ---------------------------
 // Read Analogue input channel
 // ---------------------------
+var
+   Err : Integer ;
 begin
      Result := 0 ;
      if not DeviceInitialised then VP500_InitialiseBoard ;

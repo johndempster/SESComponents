@@ -2114,7 +2114,7 @@ function NI_DeviceExists( iDev : Integer  ) : Boolean ;
 // Return TRUE if device available
 // -------------------------------
 var
-    Err,BoardTypeNumber : SmallInt ;
+    Err,BoardTypeNumber,iDev16 : SmallInt ;
 
 begin
 
@@ -2123,7 +2123,9 @@ begin
     if not NIDAQLoaded then NI_LoadNIDAQLibrary ;
     if not NIDAQLoaded then Exit ;
 
+    iDev16 := iDev ;
     { If the board type is not known ... get it now, and reset card }
+    Err := -1 ;
     Err := Init_DA_Brds( iDev, BoardTypeNumber ) ;
     if Err = 0 then Result := True
 

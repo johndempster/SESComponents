@@ -1529,6 +1529,7 @@ var
   continuous_stimuli : ByteBool ;
   start_on_trigger : ByteBool ;
   SamplingIntervalMultiplier : Integer ;
+    StreamBuf : PSmallIntArray ;
 begin
     Result := False ;
     if not DeviceInitialised then Exit ;
@@ -1669,6 +1670,7 @@ begin
        GetADCSamplesInUse := False ;
        Exit ;
        end ;
+    Err := 0 ;
 
     NumPointsInBuf := FNumSamples*FNumChannels ;
     EndOfBuf := NumPointsInBuf - 1 ;

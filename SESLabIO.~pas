@@ -1784,8 +1784,7 @@ begin
                                               FDACNumSamples,
                                               DigBuf^,
                                               False,
-                                              FStimulusExtTrigger,
-                                              false ) ;
+                                              FStimulusExtTrigger ) ;
              end ;
 
        Triton : begin
@@ -1919,8 +1918,7 @@ begin
                                               FDACNumSamples,
                                               DigBuf^,
                                               True,
-                                              FStimulusExtTrigger,
-                                              false ) ;
+                                              FStimulusExtTrigger ) ;
              end ;
 
           Triton : begin

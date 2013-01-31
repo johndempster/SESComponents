@@ -1329,7 +1329,7 @@ var
    OutputEnable : Cardinal ;
 
 begin
-     Result := 0 ;
+
      if not DeviceInitialised then ITC_InitialiseBoard ;
      if ADCActive then Exit ;
 

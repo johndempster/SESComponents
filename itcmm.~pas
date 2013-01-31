@@ -1350,6 +1350,7 @@ const
 var
     TicksRequired,Multiplier,iStep : Cardinal ;
     Steps : Array[0..4] of Cardinal ;
+    i : Integer ;
 begin
 
      // Ensure sampling interval remains within supported limits
@@ -1520,7 +1521,7 @@ begin
 
        end ;
 
-    //outputdebugstring(pchar(format('%d',[iFIFO])));
+    outputdebugstring(pchar(format('%d',[iFIFO])));
 
     Config.Sequence := @Sequence ;
     Config.SequenceLengthIn := 0 ;
