@@ -74,6 +74,10 @@ contains
   USE1401 in 'USE1401.PAS',
   dd1440 in 'dd1440.pas',
   TritonUnit in 'TritonUnit.pas',
+<<<<<<< HEAD
+=======
+  GraphicEx in 'GraphicEx\GraphicEx.pas',
+>>>>>>> origin/master
   WirelessEEGUnit in 'WirelessEEGUnit.pas',
   HekaUnit in 'HekaUnit.pas',
   AndorUnit in 'AndorUnit.pas',
@@ -93,6 +97,7 @@ contains
   imaq1394 in 'imaq1394.pas',
   Itex in 'Itex.pas',
   PixelFlyUnit in 'PixelFlyUnit.pas',
+<<<<<<< HEAD
   Maths in 'Maths.pas',
   MatrixDisplay in 'MatrixDisplay.pas',
   MZLib in 'MZLib.pas',
@@ -101,5 +106,14 @@ contains
   GraphicEx in 'GraphicEx.pas',
   GraphicStrings in 'GraphicStrings.pas',
   JPG in 'JPG.pas';
+=======
+  GraphicStrings in 'GraphicEx\GraphicStrings.pas',
+  JPG in 'GraphicEx\JPG.pas',
+  MZLib in 'GraphicEx\MZLib.pas',
+  GraphicColor in 'GraphicEx\GraphicColor.pas',
+  GraphicCompression in 'GraphicEx\GraphicCompression.pas',
+  Maths in 'Maths.pas',
+  MatrixDisplay in 'MatrixDisplay.pas';
+>>>>>>> origin/master
 
 end.

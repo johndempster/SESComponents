@@ -45,7 +45,6 @@ unit IDRFile;
 //             because it was returning incorrect file size for files > 2Gbyte
 // 24.07.12 .. DiskSpaceAvailable now works correctly for all drives
 // 31.07.12 .. Max. no. of ROIs increased to 100
-// 30.01.13 .. Z stack parameters (ZNUMSECTIONS,ZSTART,ZSPACING) added
 
 interface
 
@@ -170,9 +169,6 @@ TChannel = record
     FFrameWidth : Integer ;        // Image frame width (pixels)
     FFrameHeight : Integer ;       // Image frame height (pixels)
     FPixelDepth : Integer ;        // No. of bits per pixel
-    FNumZSections : Integer ;         // No. of Z sections
-    FZStart : Single ;                // Z position of first Z section
-    FZSpacing : Single ;       // Spacing between Z sections
     FFrameInterval : Single ;      // Frame capture interval (s)
     FNumBytesPerFrame : Integer ;    // No. bytes per frame
     FNumPixelsPerFrame : Integer ; // No. of pixels per frame
@@ -264,7 +260,7 @@ TChannel = record
 
     NoPreviousOpenFile : Boolean ;   // No file has been opened yet flag
     HeaderFull : Boolean ;
-    Header : array[1..cNumIDRHeaderBytes] of ANSIchar ;
+    Header : array[1..cNumIDRHeaderBytes] of char ;
     
     Err : Boolean ;
     procedure GetIDRHeader ;
@@ -277,49 +273,49 @@ TChannel = record
     function GetNumScansInEDRFile : Integer ;
 
     procedure AppendFloat(
-              var Dest : array of ANSIchar;
+              var Dest : array of char;
               Keyword : string ;
               Value : Extended
               ) ;
     procedure ReadFloat(
-              const Source : array of ANSIchar;
+              const Source : array of char;
               Keyword : string ;
               var Value : Single ) ;
     procedure AppendInt(
-              var Dest : array of ANSIchar;
+              var Dest : array of char;
               Keyword : string ;
               Value : LongInt
               ) ;
     procedure ReadInt(
-              const Source : array of ANSIchar;
+              const Source : array of char;
               Keyword : string ;
               var Value : LongInt
               ) ;
     procedure AppendLogical(
-              var Dest : array of ANSIchar;
+              var Dest : array of char;
               Keyword : string ;
               Value : Boolean ) ;
     procedure ReadLogical(
-              const Source : array of ANSIchar;
+              const Source : array of char;
               Keyword : string ;
               var Value : Boolean
               ) ;
     procedure AppendString(
-              var Dest : Array of ANSIchar;
+              var Dest : Array of char;
               Keyword,
               Value : string
               ) ;
     procedure ReadString(
-              const Source : Array of ANSIChar;
+              const Source : Array of char;
               Keyword : string ;
               var Value : string
               ) ;
 
-    procedure CopyStringToArray( var Dest : array of ANSIChar ; Source : string ) ;
-    procedure CopyArrayToString( var Dest : string ; var Source : array of ANSIChar ) ;
+    procedure CopyStringToArray( var Dest : array of char ; Source : string ) ;
+    procedure CopyArrayToString( var Dest : string ; var Source : array of char ) ;
 
     procedure FindParameter(
-              const Source : array of ANSIChar ;
+              const Source : array of char ;
               Keyword : string ;
               var Parameter : string ) ;
 
@@ -484,11 +480,6 @@ TChannel = record
     Property FrameHeight : Integer read FFrameHeight write FFrameHeight; // Image frame height (pixels)
     Property PixelDepth : Integer read FPixelDepth write SetPixelDepth ;   // No. of bits per pixel
     Property FrameInterval : Single read FFrameInterval write FFrameInterval;      // Frame capture interval (s)
-
-    Property NumZSections : Integer read FNumZSections write FNumZSections ;
-    Property ZSpacing : Single read FZSpacing write FZSpacing ;
-    Property ZStart : Single read FZStart write FZStart ;
-
     Property NumBytesPerFrame : Integer read FNumBytesPerFrame ;  // No. bytes per frame
     Property NumPixelsPerFrame : Integer read FNumPixelsPerFrame ; // No. of pixels per frame
     Property NumBytesPerPixel : Integer read FNumBytesPerPixel ;  // No. of bytes per image pixel
@@ -499,6 +490,7 @@ TChannel = record
     Property ResolutionUnits : String read FResolutionUnits write FResolutionUnits ;     // Pixel width measurement units
     Property NumIDRHeaderBytes : Integer Read FNumIDRHeaderBytes ;
     Property NumEDRHeaderBytes : Integer Read FNumEDRHeaderBytes ;
+
 
     Property ADCNumScansInFile : Integer Read FADCNumScansInFile Write FADCNumScansInFile ;  // No. of A/D multi-channel scans in file
     Property ADCNumChannels : Integer Read FADCNumChannels Write SetADCNumChannels ;
@@ -589,6 +581,7 @@ TChannel = record
     Property EventF0SubtractF0 : Boolean
              read FEventF0SubtractF0 write FEventF0SubtractF0 ;
 
+
     Property FrameTypeCycleLength : Integer read FFrameTypeCycleLength ;
 
     Property FileHeader : string read GetFileHeader ;
@@ -637,10 +630,6 @@ begin
      FResolutionUnits := '' ;
      FXResolution := 1.0 ;
      FYResolution := 1.0 ;
-
-    FNumZSections := 1 ;
-    FZStart :=0.0 ;
-    FZSpacing := 1.0 ;
 
      FMaxROI := cMaxROIs ;
 
@@ -889,10 +878,6 @@ begin
     FIntensityOffset := Source.IntensityOffset ;
     FXResolution := Source.XResolution ;
     FResolutionUnits := Source.ResolutionUnits ;
-
-    FNumZSections := Source.NumZSections ;
-    FZStart := Source.ZStart ;
-    FZSpacing := Source.ZSpacing ;
 
     // Set file header size to current default size
     FNumIDRHeaderBytes := cNumIDRHeaderBytes ;
@@ -1164,11 +1149,6 @@ begin
      ReadInt( Header, 'NBPP=', FNumBytesPerPixel ) ;
      ReadInt( Header, 'NF=', FNumFrames ) ;
 
-     ReadInt(Header, 'ZNUMS=',FNumZSections) ;
-     FNumZSections := Max(FNumZSections,1) ;
-     ReadFloat( Header, 'ZSTART=',FZStart) ;
-     ReadFloat( Header, 'ZSPACING=',FZSpacing) ;
-
      // Correct number of frames list in file header
      NumBytesPerFrame := FFrameHeight*FFrameWidth*FNumBytesPerPixel ;
      FNumBytesPerFrame := NumBytesPerFrame ;
@@ -1358,7 +1338,6 @@ begin
     ReadFloat( Header, 'EVF0DMAX=',FEventF0DisplayMax) ;
     ReadLogical(Header,'EVF0SUBF0=',FEventF0SubtractF0)  ;
 
-
      { Read Markers }
      FNumMarkers := 0 ;
      ReadInt( Header, 'MKN=', FNumMarkers ) ;
@@ -1400,10 +1379,6 @@ begin
      AppendInt( Header, 'FH=', FFrameHeight ) ;
      AppendInt( Header, 'NBPP=', FNumBytesPerPixel ) ;
      AppendInt( Header, 'PIXDEP=', FPixelDepth ) ;
-
-     AppendInt(Header, 'ZNUMS=',FNumZSections) ;
-     AppendFloat( Header, 'ZSTART=',FZStart) ;
-     AppendFloat( Header, 'ZSPACING=',FZSpacing) ;
 
      // Line scan flag
      AppendLogical( Header, 'LINESCAN=', FLineScan ) ;
@@ -1789,7 +1764,7 @@ procedure TIDRFile.SaveEDRHeader ;
   Save file header data to EDR data file
   ---------------------------------------}
 var
-   Header : array[1..cNumEDRHeaderBytes] of ANSIChar ;
+   Header : array[1..cNumEDRHeaderBytes] of char ;
    i : Integer ;
    ch : Integer ;
 begin
@@ -1856,7 +1831,7 @@ procedure TIDRFile.GetEDRHeader ;
 // Load EDR data file header
 // ------------------------
 var
-   Header : array[1..cNumEDRHeaderBytes] of ANSIChar ;
+   Header : array[1..cNumEDRHeaderBytes] of char ;
    i,ch,NumBytesInHeader : Integer ;
 begin
 
@@ -2285,7 +2260,7 @@ begin
         end ;
 
 procedure TIDRFile.AppendFloat(
-          var Dest : Array of ANSIChar;
+          var Dest : Array of char;
           Keyword : string ;
           Value : Extended ) ;
 { --------------------------------------------------------
@@ -2300,7 +2275,7 @@ begin
 
 
 procedure TIDRFile.ReadFloat(
-          const Source : Array of ANSIChar;
+          const Source : Array of char;
           Keyword : string ;
           var Value : Single ) ;
 var
@@ -2312,7 +2287,7 @@ begin
 
 
 procedure TIDRFile.AppendInt(
-          var Dest : Array of ANSIChar;
+          var Dest : Array of char;
           Keyword : string ;
           Value : LongInt ) ;
 { -------------------------------------------------------
@@ -2327,7 +2302,7 @@ begin
 
 
 procedure TIDRFile.ReadInt(
-          const Source : Array of ANSIChar;
+          const Source : Array of char;
           Keyword : string ;
           var Value : LongInt ) ;
 var
@@ -2341,7 +2316,7 @@ begin
   'Keyword' = 'Value' on to end of the header text array}
 
 procedure TIDRFile.AppendString(
-          var Dest : Array of ANSIChar;
+          var Dest : Array of char;
           Keyword, Value : string ) ;
 begin
 CopyStringToArray( Dest, Keyword ) ;
@@ -2350,7 +2325,7 @@ CopyStringToArray( Dest, chr(13) + chr(10) ) ;
 end ;
 
 procedure TIDRFile.ReadString(
-          const Source : Array of ANSIChar;
+          const Source : Array of char;
           Keyword : string ;
           var Value : string ) ;
 var
@@ -2364,7 +2339,7 @@ begin
   'Keyword' = 'Value' on to end of the header text array}
 
 procedure TIDRFile.AppendLogical(
-          var Dest : Array of ANSIChar;
+          var Dest : Array of char;
           Keyword : string ;
           Value : Boolean ) ;
 begin
@@ -2375,7 +2350,7 @@ begin
      end ;
 
 procedure TIDRFile.ReadLogical(
-          const Source : Array of ANSIChar;
+          const Source : Array of char;
           Keyword : string ;
           var Value : Boolean ) ;
 var
@@ -2388,7 +2363,7 @@ begin
 
 
 procedure TIDRFile.CopyStringToArray(
-          var Dest : array of ANSIChar ;
+          var Dest : array of char ;
           Source : string ) ;
 var
    i,j : Integer ;
@@ -2412,7 +2387,7 @@ begin
 
 procedure TIDRFile.CopyArrayToString(
           var Dest : string ;
-          var Source : array of ANSIChar ) ;
+          var Source : array of char ) ;
 var
    i : Integer ;
 begin
@@ -2424,7 +2399,7 @@ begin
 
 
 procedure TIDRFile.FindParameter(
-          const Source : array of ANSIChar ;
+          const Source : array of char ;
           Keyword : string ;
           var Parameter : string ) ;
 var

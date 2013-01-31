@@ -1,0 +1,156 @@
+
+Topography-File:
+----------------
+                ---------------------------------------------
+               |  ********  Topography File  ********        |
+               |                                             |
+               |    Lenght: n*m+0400H Byte                   |
+               |              m = Pixel per Line             |
+               |              n = 2 * Number of Lines        |
+rel. Adress     =============================================     Example
+               |   z Data, 1 Pixel = 1 Byte,                 |
+               |   z=0: no surface found                     |
+               |   z=1: lowest, z=249: highest surface level |
+  0            |     Line 1                                  |
+  1*m          |     Line 2                                  |
+  2*m          |     Line 3                                  |
+               |      ...                                    |
+  (n/2-1)*m    |     Line n/2                                |
+                ---------------------------------------------
+               |   Intensity Data, 1 Pixel = 1 Byte          |
+  (n/2)*m      |     Line 1                                  |
+  (n/2+1)*m    |     Line 2                                  |
+  (n/2+2)*m    |     Line 3                                  |
+               |      ...                                    |
+  (n-1)*m      |     Line n/2                                |
+                ---------------------------------------------
+  n*m+000H     |                                             |
+    ...        |     not used                                |
+  n*m+2FFH     |                                             |
+                ---------------------------------------------
+  n*m+300H     |   Image Parameter (Selection):              |
+  n*m+308H     |     Pixel per Line       (=m)               |     256
+  n*m+30AH     |     2 * Number of Lines  (=n)               |     512
+  n*m+310H     |     Type                                    |     10
+  n*m+312H     |     Number of z Sections                    |     25
+  n*m+3C0H     |     Pixel size x in µm (float)              |     1.2
+  n*m+3C4H     |     Pixel size y in µm (float)              |     1.2
+  n*m+3C8H     |     z Section Distance in µm (float)        |     3.6
+  ... n*m+3FFh |     reserved                                |
+                ---------------------------------------------
+
+
+
+Private TIF-Data for LSM
+========================
+
+
+Offset  Type        Description
+-------------------------------------------------------------------
+ 0000h  WORD        Code 494Ch
+ 0002h  WORD        Version (actual: 0002h)
+ 0004h  WORD        Image type
+                      Bit 0/1  Number of 8 bit planes
+                      Bit 2/3  Number of channels per pixel
+                      Bit 4    0: Original data,
+                               1: Calculated data (animation)
+                      Bit 5    1: Time series
+                      Bit 6    Reserved (0 or 1)
+                      Bit 7    1: Image is part of sequence
+                      Bit 8    1: y-direction is Time
+                      Bit 9    1: x-direction is Time
+ 0006h  WORD        Reserved
+ 0008h  WORD        x size of image
+ 000ah  WORD        y size of image
+ 000ch  WORD        x position of ROI
+ 000eh  WORD        x position of ROI
+ 0010h  WORD        x size of image display mask
+ 0012h  WORD        y size of image display mask
+ 0014h  WORD        Reserved
+ 0016h  WORD        Reserved
+ 0018h  WORD        Image position number in a sequence
+ 001ah  BYTE        Reserved
+ 001bh  BYTE        Number of valid channel parameters (1..3)
+ 001ch  BYTE        Number of lasers (1..4)
+ 001dh  3 bytes     Reserved
+ 0020h  float       x size of a pixel (µm or s)
+ 0024h  float       y size of a pixel (µm or s)
+ 0028h  float       z distance in a sequence (µm or s)
+ 002ch  float       Sequence value (µm / s)
+ 0030h  8 x WORD    List of laser lines (nm)
+                     ----------------------------------------
+ 0040h  64 bytes    | Channel parameters 1                   |
+                     ----------------------------------------
+ 0080h  64 bytes    | Channel parameters 2 (if available)    |
+                     ----------------------------------------
+ 00c0h  64 bytes    | Channel parameters 3 (if available)    |
+                     ---------------------------------------
+ 0100h  16 x char   User text 1
+ 0110h  16 x char   User text 2
+ 0120h  16 x char   Date and time text
+ 0130h  16 x char   Beam splitter text (channel 1, should be valid for all)
+ 0140h  time_t      The time in seconds since midnight (00:00:00),
+                    January 1, 1970, Universal Coordinated Time
+ 0144h  WORD        Fraction of a second in milliseconds
+ 0146h  short       Timezone difference in minutes
+ 0148h  short       Daylight saving flag
+ 014ah  float       Real scan time for one image (s)
+ 014eh  2 bytes     Reserved
+ 0150h  16 x char   Emission filter channel 1 text
+ 0160h  16 x char   Emission filter channel 2 text (if available)
+ 0170h  16 x char   Emission filter channel 3 text (if available)
+ 0180h  32 x char   Reserved for lens decription text
+
+
+Channel Parameters (64 bytes)
+-----------------------------
+
+Offset  Type        Description
+-------------------------------------------------------------------
+ 0000h  BYTE        Source
+                      1  Conv Refl
+                      2  Conv Trans
+                      3  Conv Overl
+                      4  Conv Fluor
+                      5  LSM Refl1
+                      6  LSM Refl2
+                      7  LSM Refl3
+                      8  LSM Trans
+                      9  OBIC
+                     10  Extern
+ 0001h  BYTE        Pinhole
+ 0002h  BYTE        Emission filter
+ 0003h  BYTE        Flags
+                      Bit 0  TV
+                      Bit 1  Confocal
+                      Bit 2  Reserved
+                      Bit 3  Ratio
+ 0004h  BYTE        Attenuation filter 1
+ 0005h  BYTE        Attenuation filter 2
+ 0006h  BYTE        Attenuation filter 3
+ 0007h  BYTE        Laser (each bit represents one laser line)
+ 0008h  BYTE        Scanning time
+ 0009h  BYTE        Bandwidth
+ 000ah  BYTE        Beam splitter
+ 000bh  BYTE        Lens
+ 000ch  BYTE        Scan function
+ 000dh  BYTE        Averaging mode (reserved)
+ 000eh  WORD        Number of averaging
+ 0010h  WORD        Contrast
+ 0012h  WORD        Brightness
+ 0014h  long        x motor (in motor steps)
+ 0018h  long        y motor (in motor steps)
+ 001ch  long        z motor (in motor steps)
+ 0020h  WORD        Zoom factor * 1000
+ 0022h  short       Angle of rotation (0.1 degree)
+ 0024h  WORD        Obic address 1
+ 0026h  WORD        Obic address 2
+ 0028h  short       Scan offset x
+ 002ah  short       Scan offset y
+ 002ch  BYTE        Attenuation filter 4
+ 002dh  3 bytes     Reserved
+ 0030h  float       Objective magnification
+ 0034h  float       Objective apperture
+ 0038h  float       Reserved
+ 003ch  float       Reserved
+-------------------------------------------------------------------

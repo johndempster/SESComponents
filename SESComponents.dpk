@@ -100,7 +100,11 @@ contains
   GraphicCompression in 'GraphicCompression.pas',
   GraphicEx in 'GraphicEx.pas',
   GraphicStrings in 'GraphicStrings.pas',
+<<<<<<< HEAD
   JPG in 'JPG.pas',
   TVicLib in 'TVicLib.pas';
+=======
+  JPG in 'JPG.pas';
+>>>>>>> origin/master
 
 end.
