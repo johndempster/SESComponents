@@ -9,7 +9,7 @@ unit CurveFitter;
 interface
 
 uses
-  SysUtils, Classes, COmCtrls, SHDocVw ;
+  SysUtils, Classes, COmCtrls, SHDocVw, Dialogs ;
 
 const
      ChannelLimit = 7 ;
@@ -48,7 +48,8 @@ type
                  DecayingExp2,
                  DecayingExp3,
                  Boltzmann,
-                 PowerFunc ) ;
+                 PowerFunc,
+                 SinSqrd ) ;
 
     TPars = record
           Value : Array[0..LastParameter+1] of Single ;
@@ -87,6 +88,8 @@ type
     DegreesOfFreedomValue : Integer ; { Statistical deg's of freedom }
     IterationsValue : Integer ;    // No. of iterations to achieve fit
     GoodFitFlag : Boolean ;        // Fit has been successful flag
+
+    HalfPi: Double;
 
     Procedure SetupNormalisation( xScale : single ; yScale : single ) ;
     function NormaliseParameter( Index : Integer ; Value : single ) : single ;
@@ -249,12 +252,13 @@ constructor TCurveFitter.Create(AOwner : TComponent) ;
   Initialise component's internal objects and fields
   -------------------------------------------------- }
 begin
-
      inherited Create(AOwner) ;
 
      FXUnits := '' ;
      FYUnits := '' ;
      nPoints := 0 ;
+
+     HalfPi := Pi/2.0;
 
      end ;
 
@@ -385,7 +389,11 @@ begin
                               + '/x<sub>slp</sub>)) + y<sub>min</sub>' ;
 
           PowerFunc : Name := 'y(x) = Ax<sup>B</sup>' ;
-          
+
+          SinSqrd: Name := 'y(x) = Amp sin<sup>2</sup> [(pi/2)(x - '
+                                   + 'V<sub>b</sub>)/V<sub>pi</sub>] + '
+                                   + 'P<sub>min</sub>';
+
           else Name := 'None' ;
           end ;
 
@@ -531,6 +539,7 @@ begin
           DecayingExp3 : nPars := 6 ;
           Boltzmann : nPars := 4 ;
           PowerFunc : nPars := 2 ;
+          SinSqrd: nPars := 4;
           else nPars := 0 ;
           end ;
      Result := nPars ;
@@ -767,6 +776,13 @@ begin
                  ParNames[1] := 'B' ;
                  end ;
 
+          SinSqrd: begin
+                     ParNames[0] := 'V<sub>pi</sub>';
+                     ParNames[1] := 'V<sub>b</sub>';
+                     ParNames[2] := 'Amp';
+                     ParNames[3] := 'P<sub>min</sub>';
+                   end;
+
           else begin
                end ;
           end ;
@@ -953,6 +969,12 @@ begin
                  ParUnits[1] := FXUnits  ;
                  end ;
 
+          SinSqrd: begin
+                     ParUnits[0] := FXUnits;
+                     ParUnits[1] := FXUnits;
+                     ParUnits[2] := FYUnits;
+                     ParUnits[3] := FYUnits;
+                   end;
           else begin
                end ;
           end ;
@@ -988,6 +1010,7 @@ Function TCurveFitter.EquationValue(
   ---------------------------------------------------}
 var
    Y,A,A1,A2,Theta1,Theta2 : Single ;
+   Arg: single;
 begin
 
      Case FEqnType of
@@ -1125,6 +1148,10 @@ begin
              Y := Pars[0]*FPower(x,Pars[1]) ;
              end ;
 
+          SinSqrd: begin
+                     Arg := HalfPi * (X - Pars[1]) / Pars[0];
+                     Y := Pars[2] * Sin(Arg) * Sin(Arg) + Pars[3];
+                   end;
           else Y := 0. ;
           end ;
 
@@ -1590,6 +1617,20 @@ begin
                  ParameterScaleFactors[1] := 1.0 ;
                  end ;
 
+           SinSqrd: begin
+                      AbsPars[0] := False;
+                      LogPars[0] := False;
+                      ParameterScaleFactors[0] := xScale;
+                      AbsPars[1] := False;
+                      LogPars[1] := False;
+                      ParameterScaleFactors[1] := xScale;
+                      AbsPars[2] := False;
+                      LogPars[2] := False;
+                      ParameterScaleFactors[2] := yScale;
+                      AbsPars[3] := False;
+                      LogPars[3] := False;
+                      ParameterScaleFactors[3] := yScale;
+                    end;
           end ;
 
      Normalised := True ;
@@ -1966,6 +2007,13 @@ begin
                  if (YData[iEnd] > YData[0]) then Guess[1] := 2.0
                                              else Guess[1] := -2.0 ;
                  end ;
+
+           SinSqrd: begin
+                      Guess[0] := XAtYmax;
+                      Guess[1] := XAtYmin;
+                      Guess[2] := YMax - YMin;
+                      Guess[3] := YMin;
+                    end;
            end ;
 
       if (Index >= 0) and (Index<GetNumParameters)  then begin
