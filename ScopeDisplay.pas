@@ -242,6 +242,7 @@ type
     //Display settings
     FGridColor : TColor ;         // Calibration grid colour
     FTraceColor : TColor ;        // Trace colour
+    FPreviousTraceColor: TColor;  // Color of previous traces left on display
     FBackgroundColor : TColor ;   // Background colour
     FCursorColor : TColor ;       // Cursors colour
     FNonZeroHorizontalCursorColor : TColor ; // Cursor colour
@@ -466,6 +467,8 @@ type
              read GetHorCursor write SetHorCursor ;
     property VerticalCursors[ i : Integer ] : Integer
              read GetVertCursor write SetVertCursor ;
+    function GetTraceColor: TColor;
+    function GetPreviousTraceColor: TColor;
 
   published
     { Published declarations }
@@ -606,6 +609,7 @@ begin
 
      FGridColor := clLtGray ;
      FTraceColor := clBlue ;
+     FPreviousTraceColor := clAqua;
      FBackgroundColor := clWhite ;
      FCursorColor := clNavy ;
      FNonZeroHorizontalCursorColor := clRed ;
@@ -4075,8 +4079,15 @@ begin
      Inc(ZoomRectCount) ;
      end ;
 
+function TScopeDisplay.GetTraceColor: TColor;
+begin
+  Result := FTraceColor;
+end;
+
+function TScopeDisplay.GetPreviousTraceColor: TColor;
+begin
+  Result := FPreviousTraceColor;
+end;
 
 end.
-
-
 
