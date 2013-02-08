@@ -101,6 +101,8 @@ unit ScopeDisplay;
   15.11.11 ... JD CopyDataToClipboard now also copies FLINE external line data points
   26.07.12 ... JD time calibration bar in print and clipboard images no longer has excessive digits
   04.09.12 ... JD Vertical tickmarks now computed correctly when Y axis scaling factor is negative
+  05.02.13 ... DE Let channel name be displayed even when channel not in use
+                  (feature request from Dan Galtieri)
   }
 
 interface
@@ -551,7 +553,8 @@ procedure Register;
 
 implementation
 const
-    LeftEdgeSpace = 50 ;
+    // LeftEdgeSpace = 50 ;
+    LeftEdgeSpace = 75 ;
     RightEdgeSpace = 20 ;
     cZoomInButton = 0 ;
     cZoomOutButton = 1 ;
@@ -1052,7 +1055,33 @@ begin
                          ButtonSize,
                          cEnabledButton,
                          ch ) ;
+                  Canv.Font.Color := clBlack ;
 
+         // Draw label & units mid-way between lower and upper limits
+         YMid := (Channel[ch].Top + Channel[ch].Bottom) div 2 ;
+         // s := Format('%s (%s)', [Channel[ch].ADCName, Channel[ch].ADCUnits]);
+         if Channel[ch].InUse then
+         begin
+           s := Channel[ch].ADCName ;
+           Canv.TextOut(XPix + ButtonSize + Canv.TextWidth('n'),
+                        YMid - Canv.TextHeight('X') div 2,
+                        s);
+           // Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
+           //              YMid - Canv.TextHeight(s) -1,
+           //              s) ;
+
+           s := Channel[ch].ADCUnits ;
+           // Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
+           Canv.TextOut(XPix + ButtonSize + Canv.TextWidth('n'),
+                        YMid + Canv.TextHeight('X') div 2,
+                        s) ;
+         end else
+         begin
+           s := Format('%s (%s)', [Channel[ch].ADCName, Channel[ch].ADCUnits]);
+           Canv.TextOut(XPix + ButtonSize + Canv.TextWidth('n'),
+                        YMid,
+                        s);
+         end;
          end ;
 
      { Update horizontal cursor limits/scale factors to match channel settings }
@@ -1238,19 +1267,20 @@ begin
      for ch := 0 to FNumChannels-1 do if Channel[ch].InUse then begin
 
          Canv.Pen.Color := clBlack ; //Channel[ch].Color ;
-         Canv.Font.Color := clBlack ;
+         // Moved up to the cEnabledButton display, so name is always visible
+         //Canv.Font.Color := clBlack ;
 
          // Draw label & units mid-way between lower and upper limits
          YMid := (Channel[ch].Top + Channel[ch].Bottom) div 2 ;
-         s := Channel[ch].ADCName ;
-         Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
-                       YMid - Canv.TextHeight(s) -1,
-                       s) ;
+         // s := Channel[ch].ADCName ;
+         //Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
+         //              YMid - Canv.TextHeight(s) -1,
+         //              s) ;
 
-         s := Channel[ch].ADCUnits ;
-         Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
-                       YMid,
-                       s) ;
+         // s := Channel[ch].ADCUnits ;
+         // Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
+         //               YMid,
+         //               s) ;
 
          if not FZoomDisableVertical then begin
             DrawZoomButton( Canv,
