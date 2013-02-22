@@ -244,7 +244,7 @@ function TValidatedEdit.LimitTo(
 begin
 
     // Exit if limits have not been set
-    Result := Value ;
+    //Result := Value ;
 
     if FLoLimitSet then begin
        try if Value < FLoLimit then Value := FLoLimit ;

@@ -310,10 +310,8 @@ var
    ComError,NumBytesRead : DWORD ;
    rBuf : array[0..999999] of byte ;
    i,ch : Integer ;
-   iDWord,nWritten : DWord ;
    iByte : Byte ;
    s : string ;
-   Overlapped : Pointer ;
    iMult : Integer ;
    SaveChannels : Boolean ;
 begin

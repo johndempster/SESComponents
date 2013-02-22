@@ -106,6 +106,8 @@ unit SESLabIO;
             holding level saved in XML file being overwritten
   20.09.12 DoNotSaveSettings property added. When DoNotSaveSettings is set TRUE
            interface settings are not saved to XML in .Destroy()
+  11.02.13 No. of A/D channels now passed to DD1440_CheckSamplingInterval()
+           Digidata 1440A I/O buffers increased to 8 Mbytes using circular buffer
   ================================================================================ }
 
 interface
@@ -1785,7 +1787,7 @@ begin
                                               DigBuf^,
                                               False,
                                               FStimulusExtTrigger,
-                                              false ) ;
+                                              FDACRepeatedWaveform ) ;
              end ;
 
        Triton : begin
@@ -2538,7 +2540,7 @@ begin
           FADCSamplingInterval := Min( Max( FADCSamplingInterval,
                                             FADCMinSamplingInterval),
                                             FADCMaxSamplingInterval) ;
-          DD1440_CheckSamplingInterval(FADCSamplingInterval);
+          DD1440_CheckSamplingInterval(FADCSamplingInterval,FADCNumChannels);
           end ;
        Triton : begin
           FADCSamplingInterval := Min( Max( FADCSamplingInterval,

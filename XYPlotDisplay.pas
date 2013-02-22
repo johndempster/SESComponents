@@ -1395,7 +1395,7 @@ begin
      // Open clipboard preventing others acceessing it
      Clipboard.Open ;
 
-     try
+
 
         // Find maximum number of points in any line
         NumPointsMax := 0 ;
@@ -1413,8 +1413,10 @@ begin
         if Histogram then BufSize := BufSize*2 ;
 
         CopyBuf := StrAlloc( BufSize ) ;
-        StrCopy(CopyBuf, PChar('')) ;
 
+
+     try
+        StrCopy(CopyBuf, PChar('')) ;
         { Initialisations for cumulative and/or percentage histograms }
         for L := 0 to High(FLines) do if FLines[L].XYBuf <> Nil then begin
             // Initialise cumulative Y value
@@ -1605,7 +1607,7 @@ procedure TXYPlotDisplay.DefineAxis(
   Find a suitable min/max range and ticks for a plot axis
   -------------------------------------------------------}
 var
-   R,Max,Min,MinPositive,Range,Start,Step,YSum,YScale : Single ;
+   R,Max,Min,MinPositive,Range,YSum,YScale : Single ;
    L,i : Integer ;
    pXY : pChar ;
 begin
@@ -1952,7 +1954,6 @@ begin
      SavePen := TPen.Create ;
      SaveBrush := TBrush.Create ;
 
-     try
         { Save current pen/brush settings }
         SavePen.Assign(Canv.Pen) ;
         SaveBrush.Assign(Canv.Brush) ;
@@ -2040,6 +2041,7 @@ begin
                    if FHistogramFullBorders then Canv.LineTo( xPixHi,yPix0 ) ;
                    end ;
                 end ;
+
             { Make sure right hand edge of last bin is drawn }
             if (BinHi <= FXAxis.Hi) then Canv.LineTo( xPixHi,yPix0 ) ;
 
@@ -2048,12 +2050,11 @@ begin
         { Restore original pen settings }
         Canv.Pen.Assign(SavePen) ;
         Canv.Brush.Assign(SaveBrush) ;
-     finally
+
             { Dispose of objects }
             SavePen.Free ;
             SaveBrush.Free ;
             end ;
-     end ;
 
 
 
@@ -2077,13 +2078,13 @@ begin
      Printer.BeginDoc ;
      Cursor := crHourglass ;
 
-     try
+
         Printer.Canvas.Pen.Color := clBlack ;
         Printer.Canvas.Font.Name := FPrinterFontName ;
         Printer.Canvas.font.size := FPrinterFontSize ;
         KeepLineWidth := FLineWidth ;
         FLineWidth := PrinterPointsToPixels(FPrinterLineWidth) ;
-
+     try
         { Set bounding rectangle of plot on printed page }
         FLeft := FPrinterLeftMargin ;
         FRight := Printer.PageWidth - FPrinterRightMargin ;

@@ -988,7 +988,6 @@ Function TCurveFitter.EquationValue(
   ---------------------------------------------------}
 var
    Y,A,A1,A2,Theta1,Theta2 : Single ;
-   Area,Tau,Area1,Tau1,Area2,Tau2,Area3,Tau3 : single ;
 begin
 
      Case FEqnType of

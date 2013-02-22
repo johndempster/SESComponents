@@ -870,31 +870,11 @@ procedure VP500_WriteDACsAndDigitalPort(
   Update D/A outputs with voltages suppled in DACVolts
   and TTL digital O/P with bit pattern in DigValue
   ----------------------------------------------------}
-const
-     MaxDACValue = 32767 ;
-     MinDACValue = -32768 ;
-var
-   DACScale : single ;
-   ch,DACValue : Integer ;
 begin
 
      if not DeviceInitialised then VP500_InitialiseBoard ;
+     exit ;
 
-     if DeviceInitialised then begin
-
-        // Scale from Volts to binary integer units
-        DACScale := MaxDACValue/FDACVoltageRangeMax ;
-
-        { Set up D/A channel values }
-        for ch := 0 to nChannels-1 do begin
-            // Correct for errors in hardware DAC scaling factor
-            DACValue := Round(DACVolts[ch]*DACScale) ;
-            // Keep within legitimate limits
-            if DACValue > MaxDACValue then DACValue := MaxDACValue ;
-            if DACValue < MinDACValue then DACValue := MinDACValue ;
-            end ;
-
-        end ;
 
 
      end ;

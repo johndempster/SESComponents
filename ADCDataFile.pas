@@ -2768,8 +2768,6 @@ var
 begin
 
      Result := False ;
-
-     Result := False ;
      if FileHandle < 0 then Exit ;
 
      for i := 1 to High(Header) do Header[i] := #0 ;
@@ -2871,6 +2869,7 @@ begin
      FileSeek( FileHandle, 0, 0 ) ;
      if FileRead( FileHandle, Header, SizeOf(Header) ) <> SizeOf(Header) then begin
         ShowMessage( FFileName + ' : Error reading file header!' ) ;
+        Result := False ;
         Exit ;
         end ;
 
@@ -3224,6 +3223,7 @@ begin
     FileSeek( FileHandle, 0, 0 ) ;
     if FileRead(FileHandle,pc5Header,Sizeof(pc5Header))
        <> Sizeof(pc5Header) then begin
+       Result := False ;
        Exit ;
        end ;
 
@@ -3630,7 +3630,8 @@ begin
        ShowMessage( 'Error writing ABF file header to ' + FileName ) ;
 
     UseTempFile := False ;
-
+    Result := True ;
+    
     end ;
 
 
@@ -3710,7 +3711,7 @@ begin
       FNumScansPerRecord := 0 ;
       FNumChannelsPerScan := 0 ;
       FScanInterval := 1.0 ;
-      TScale := 1.0 ;
+      //TScale := 1.0 ;
       for CFSCh := 0 to CFSFileHeader.DataChans-1 do begin
 
           if ChannelInfo[CFSCh].DataPoints <= 0 then Continue ;
@@ -4388,7 +4389,7 @@ function TADCDataFile.RAWLoadHeader : Boolean ;
 // Initialise RAW data file
 // -------------------------
 var
-   i,j,ch : Integer ;
+   i,ch : Integer ;
    NumDataBytesInFile : Integer ;
    Buf : Array[1..512] of Char ;
    iEnd : Integer ;
@@ -4454,13 +4455,13 @@ var
 
      i : Integer ;
      ch : Integer ;
-     NumDataBytes : Integer ;
+     //NumDataBytes : Integer ;
      VersionNum : SmallInt ;
      Value : Single ;
      MaxValue : Array[0..MAXDIMS-1] of Single ;
-     OK : Boolean ;
+     //OK : Boolean ;
 begin
-
+    Result := False ;
     // Read first 2 bytes to determine IBW file version number
     FileSeek( FileHandle, 0, 0 ) ;
     if FileRead(FileHandle,VersionNum,Sizeof(VersionNum))
@@ -4623,9 +4624,9 @@ function TADCDataFile.IBWSaveFileHeader : Boolean ;
 var
      IGORBinHeader5 : TIGORBinHeader5 ;
      IGORWaveHeader5 : TIGORWaveHeader5 ;
-     i : Integer ;
-     ch : Integer ;
-     s : string ;
+     //i : Integer ;
+     //ch : Integer ;
+     //s : string ;
      CheckSum : Integer ;
 begin
 
@@ -4932,10 +4933,10 @@ begin
          NumSamplesTotal := NumSamplesTotal + PNMBlockHeader.BlockSize div 2 ;
 
          if (PNMBlockHeader.ElapsedTime - PreviousElapsedTime) > 5  then begin
-            if iKeepList < 6 then iKeepList := 0
-            else if iKeepList < 10 then iKeepList := 6
-            else if iKeepList < 14 then iKeepList := 10
-            else iKeepList := 14 ;
+            //if iKeepList < 6 then iKeepList := 0
+            //else if iKeepList < 10 then iKeepList := 6
+            //else if iKeepList < 14 then iKeepList := 10
+            //else iKeepList := 14 ;
             iKeepList := 0 ;
 
             if Pos('a138.pro',LowerCase(FFileName)) > 0 then iKeepList := 0 ;
@@ -5046,7 +5047,7 @@ begin
          FileWrite( TempHandle, OutBuf, (MaxScans)*FNumChannelsPerScan*2 ) ;
 
          for i := 0 to FNumChannelsPerScan-1 do  begin
-             OutBuf[i] := LatestValue[ch] ;
+             OutBuf[i] := LatestValue[i] ;
              end ;
 
          NumScansInFile := NumScansInFile + (MaxScans) ;
@@ -5151,7 +5152,7 @@ begin
            end
         else if NumItems > 1 then begin
            // Write time point data to temp. file
-           ch := 0 ;
+           //ch := 0 ;
            for ch := 0 to FNumChannelsPerScan-1 do begin
                Value := ExtractFloat( Items[ch+1],0.0 ) ;
                if Abs(Value) > MaxValue[ch] then MaxValue[ch] := Abs(Value) ;
@@ -5228,7 +5229,7 @@ var
     s : String ;
 begin
 
-    Done := False ;
+    //Done := False ;
     EOF := False ;
     NumItems := 0 ;
     Line := '' ;
@@ -5313,7 +5314,7 @@ function TADCDataFile.FloatSwapByteOrder(
          iStart : Integer
          ) : Single ;
 var
-  i : SmallInt ;
+  //i : SmallInt ;
   pBuf : Pointer ;
 begin
 
@@ -5361,7 +5362,7 @@ function TADCDataFile.CHTLoadFileHeader : Boolean ;
 // -------------------------------------------
 var
    Header : array[1..CHTFileHeaderSize] of char ;
-   i,ch,OldValue : Integer ;
+   i,ch : Integer ;
    NumSamplesInFile : Integer ;
    NumMarkers : Integer ;
    MarkerTime : Single ;
@@ -5486,14 +5487,11 @@ var
    Header : array[1..EDRFileHeaderSize] of char ;
    i,ch : Integer ;
    NumSamplesInFile : Integer ;
-   NumMarkers : Integer ;
    MarkerTime : Single ;
    MarkerText : String ;
    CHTVoltageRange : Single ;
    CHTCalibFactor : Single ;
 begin
-
-     Result := False ;
 
      Result := False ;
      if FileHandle < 0 then Exit ;
@@ -5586,7 +5584,7 @@ function TADCDataFile.WAVLoadFileHeader : Boolean ;
 // Read file header block from WAV data file
 // -------------------------------------------
 var
-   i,ch : Integer ;
+   ch : Integer ;
    RIFFHeader : TRIFFHeader ;
    FormatChunk : TWaveFormatChunk ;
    DataChunk : TWaveDataChunk ;
@@ -5711,15 +5709,15 @@ function TADCDataFile.WAVSaveFileHeader : Boolean ;
 // Save file header block to WAV data file
 // -------------------------------------------
 var
-   i,ch : Integer ;
+   ch : Integer ;
    RIFFHeader : TRIFFHeader ;
    FormatChunk : TWaveFormatChunk ;
    DataChunk : TWaveDataChunk ;
-   ChunkID : Array[0..3] of Char ;
-   ChunkSize : Cardinal ;
+   //ChunkID : Array[0..3] of Char ;
+   //ChunkSize : Cardinal ;
 begin
 
-     Result := False ;
+     //Result := False ;
 
      // Create & write file header
      FileSeek( FileHandle, 0, 0 ) ;

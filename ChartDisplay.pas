@@ -480,6 +480,9 @@ begin
      { Create plotting points array }
      New(xy) ;
 
+     SaveColor := Canvas.Pen.Color ;
+
+
      try
         { Get new sample data if range has changed }
         if (FNumSamples <> FNumSamplesOld) or
@@ -488,8 +491,6 @@ begin
            FStartAtSampleOld := FStartAtSample ;
            FNewData := True ;
            end ;
-
-        SaveColor := Canvas.Pen.Color ;
 
         { Clear display area }
         Canvas.fillrect(Canvas.ClipRect);
@@ -512,9 +513,10 @@ begin
         ChannelHeight := (AvailableHeight div NumInUse) - ChannelSpacing ;
 
         { Define display area for each channel in use }
-        TopOfChannels := cTop ;
+        //TopOfChannels := cTop ;
         cTop := 2 ;
         TopOfChannels := cTop ;
+        LastActiveChannel := 0 ;
         for ch := 0 to FNumChannels-1 do if Channel[ch].InUse then begin
              Channel[ch].Left := 5 ;
              Channel[ch].Right := Width - 5 ;
@@ -667,11 +669,11 @@ procedure TChartDisplay.GetADCSamples ;
   ---------------------------------------------------------}
 var
    Done : Boolean ;
-   i,FilePointer : Integer ;
+   i : Integer ;
    NumSamplesPerBuffer : Integer ;
    NumBytesPerBuffer : Integer ;
    NumDisplayPoints : Integer ;
-   y,ch,ChCounter,nBlock,n,ChOffset : Integer ;
+   y,ch,ChCounter,nBlock,ChOffset : Integer ;
    yMin : Array[0..ChannelLimit] of SmallInt ;
    yMax : Array[0..ChannelLimit] of SmallInt ;
    tMin : Array[0..ChannelLimit] of Integer ;
@@ -1972,17 +1974,19 @@ begin
      // Open clipboard preventing others acceessing it
      Clipboard.Open ;
 
-     try
+
 
         // Determine size of and allocate string buffer
         BufSize := 1 ;
         for ch := 0 to FNumChannels-1 do if Channel[ch].InUse then BufSize := BufSize + 1 ;
         BufSize := BufSize*10*(FNumBlocks*2) ;
         CopyBuf := StrAlloc( BufSize ) ;
+
+     try
         StrCopy(CopyBuf,PChar('')) ;
 
-        i := 0 ;
-        j := 0 ;
+        //i := 0 ;
+        //j := 0 ;
         Screen.Cursor := crHourglass ;
         t := 0.0 ;
         for i := 0 to (FNumBlocks*2)-1 do begin
@@ -2121,6 +2125,7 @@ begin
 
        if FPrinterShowLabels then begin
           { Draw vertical calibration bars }
+          LastCh := 0 ;
           for ch := 0 to FNumChannels-1 do
               if PrChan[ch].InUse and (PrChan[ch].CalBar <> 0.0) then begin
               { Bar label }
@@ -2310,6 +2315,7 @@ begin
            TMFC.Pen.Color := clBlack ;
            if FPrinterShowLabels then begin
               { Draw vertical calibration bars }
+              LastCh := 0 ;
               for ch := 0 to FNumChannels-1 do
                  if MFChan[ch].InUse and (MFChan[ch].CalBar <> 0.0) then begin
                  { Bar label }

@@ -1643,9 +1643,8 @@ procedure Triton_GetADCSamples (
 // Get latest A/D samples from device and transfer to output buffer
 // ----------------------------------------------------------------
 var
-    ch, i, j,iVmStart,NumSamplesAvailable,NumSamplesRead,Err,Err0 : Integer ;
+    ch, i, j,iVmStart,NumSamplesAvailable,NumSamplesRead,Err : Integer ;
     iBuf : PSmallIntArray ;
-    fBuf : PDoubleArray ;
     LastSampleTimeStamp : Int64 ;
     LastSampleFlag : ByteBool ;
     NumPointsInBuf : Integer ;   // No. sample points in OutBuf buffer
@@ -1660,12 +1659,12 @@ begin
 
     // Get number of samples available
     //Triton_CheckError( 'tecella_acquire_samples_available',
-                        Err0 := tecella_acquire_samples_available( TecHandle,
-                                                           0,
-                                                           NumSamplesAvailable ) ;
+    tecella_acquire_samples_available( TecHandle,
+                                       0,
+                                       NumSamplesAvailable ) ;
 
     if NumSamplesAvailable <= 0 then begin
-       outputDebugString( PChar(format('%d %d',[Err,NumSamplesAvailable]))) ;
+       //outputDebugString( PChar(format('%d %d',[Err,NumSamplesAvailable]))) ;
        GetADCSamplesInUse := False ;
        Exit ;
        end ;
@@ -1727,7 +1726,7 @@ begin
            end ;
 
         end ;
-    i := FOutPointer ;
+    //i := FOutPointer ;
     FOutPointer := FOutPointer  + NumSamplesRead*FNumChannels ;
     if FOutPointer > EndOfBuf then begin
        if not FCircularBufferMode then begin
@@ -1967,14 +1966,14 @@ begin
               StimDuration := StimDuration + RampDuration ;
 
               // Determine step size
-              RampsStepSize := Min(Max(
+             { RampsStepSize := Min(Max(
                                (Levels[iRampEnd].V - Levels[iRampStart].V)/200.0,
                                HardwarePropsEX01.stimulus_ramp_step_size_min),
-                               HardwarePropsEX01.stimulus_ramp_step_size_max) ;
-              RampsStepSize := HardwareProps.stimulus_value_lsb*
+                               HardwarePropsEX01.stimulus_ramp_step_size_max) ;}
+             { RampsStepSize := HardwareProps.stimulus_value_lsb*
                                Sign(Levels[iRampEnd].V - Levels[iRampStart].V)*
                                Max(Round(Abs(RampsStepSize)/HardwareProps.stimulus_value_lsb),1) ;
-              if RampsStepSize = 0. then RampsStepSize := HardwareProps.stimulus_value_lsb ;
+              if RampsStepSize = 0. then RampsStepSize := HardwareProps.stimulus_value_lsb ; }
               // Bug workaround for fixed step size.
               if not FCurrentClampMode then begin
                  RampsStepSize := 0.0005*Sign(Levels[iRampEnd].V - Levels[iRampStart].V) ;
@@ -2179,9 +2178,9 @@ begin
                                                            NumStream)) ;
 
       // Start recording sweep
-      ContinuousRecording := true ;
-      start_stimuli := True ;
-      continuous_stimuli := True ;
+      //ContinuousRecording := true ;
+      //start_stimuli := True ;
+      //continuous_stimuli := True ;
 
       if FTriggerMode = tmExtTrigger then start_on_trigger := True
                                     else start_on_trigger := False ;

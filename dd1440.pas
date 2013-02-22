@@ -10,6 +10,10 @@ unit dd1440;
 //          now continues into dump buffer. D/A waveform extended
 //          up to limits of D/A buffer space. Max. A/D samples now
 //          by 75% to accommodate this.
+// 22.02.13 I/O buffers increased to 8 Mbytes using circular buffer transfer to Digidata 1440
+//          Minimum sampling interval increased when more than 4 channels acquired
+//         (Digidata 1440 appears unable to sustain maximum sampling rate when more than 4 channels in use)
+
 
 interface
 
@@ -254,12 +258,12 @@ TDD1440_SetTrigThreshold =   Function (
                              nValue : SmallInt
                              ) : ByteBool ;  cdecl;
 TDD1440_GetTrigThreshold =   Function (
-                             
+
                              var nValue : SmallInt
                              ) : ByteBool ;  cdecl;
 
 TDD1440_ReadTelegraphs =   Function (
-                           
+
                            uFirstChannel : Cardinal ;
                            var pnValue : SmallInt ;
                            uValues : Cardinal
@@ -285,7 +289,7 @@ TDD1440_GetPowerOnData = Function(
                          var Data : TDD1440_PowerOnData
                          ) : ByteBool ;  cdecl;
 TDD1440_SetPowerOnData =   Function (
-                           
+
                            const Data : TDD1440_PowerOnData
                            )  : ByteBool ;  cdecl;
 
@@ -371,7 +375,9 @@ TDD1440_ADCtoVolts = Function(
             ) ;
 
   procedure DD1440_CheckSamplingInterval(
-            var SamplingInterval : Double  ) ;
+          var SamplingInterval : Double ;
+          ADCNumChannels : Integer ) ;
+
 
   function  DD1440_MemoryToDACAndDigitalOut(
           var DACValues : Array of SmallInt  ; // D/A output values
@@ -424,7 +430,7 @@ TDD1440_ADCtoVolts = Function(
 
 
 
-   function TrimChar( Input : Array of Char ) : string ;
+   function TrimChar( Input : Array of ANSIChar ) : string ;
    procedure DD1440_CheckError( OK : ByteBool ) ;
 
    procedure DD1440_FillOutputBufferWithDefaultValues ;
@@ -450,17 +456,14 @@ var
    FDACVoltageRangeMax : single ;      // Max. D/A voltage range (+/-V)
 
    DeviceInitialised : boolean ; { True if hardware has been initialised }
-   EmptyFlag : Integer ;
 
-   FADCSweepDone : Boolean ;
-
-   FADCBuf : Integer ;        // A/D buffer pointer
-   FADCBufSamplePointer : Integer ;
-   FADCBufNumSamples : Integer ;
-   FADCPointer : Integer ;    // A/D sample pointer
    FOutPointer : Integer ;    // A/D sample pointer in O/P buffer
    FNumSamplesRequired : Integer ; // No. of A/D samples to be acquired ;
    FCircularBuffer : Boolean ;     // TRUE = repeated buffer fill mode
+   AIPosition : Int64 ;
+   AIBuf : PSmallIntArray ;
+   AIPointer : Integer ;
+   AIBufNumSamples : Integer ;        // Input buffer size (no. samples)
 
    ADCActive : Boolean ;  // A/D sampling in progress flag
    DACActive : Boolean ;  // D/A output in progress flag
@@ -479,19 +482,22 @@ var
 
    NumOutChannels : Integer ;          // No. of channels in O/P buffer
    NumOutPoints : Integer ;            // No. of time points in O/P buffer
-   OutPointer : Integer ;              // Pointer to latest value written to DACBuf
+   OutPointer : Integer ;              // Pointer to latest value written to AOBuf
+   AOPosition : Int64 ;              // Pointer to latest output value
+   AORepeatWaveform : Boolean ;      // TRUE = repeated output DAC/DIG waveform
    OutValues : PSmallIntArray ;
-   ADCBuf : PSmallIntArray ;
 
-   NumPointsInDACBuf : Integer ;       // No. of time points in DACBuf
-   DACBuf : PSmallIntArray ;
+   AOBuf : PSmallIntArray ;
+   AOPointer : Integer ;
+   AOBufNumSamples : Integer ;        // Output buffer size (no. samples)
+
    DACDefaultValue : Array[0..DD1400_MAX_AO_CHANNELS-1] of SmallInt ;
 
-   ADCBufs : Array[0..MaxBufs-1] of TDATABUFFER ;
-   DACBufs : Array[0..MaxBufs-1] of TDATABUFFER ;
+   AIBufs : Array[0..MaxBufs-1] of TDATABUFFER ;
+   AOBufs : Array[0..MaxBufs-1] of TDATABUFFER ;
 
    DIGDefaultValue : Integer ;
-   
+
   DD1440_CountDevices : TDD1440_CountDevices ;
   DD1440_FindDevices : TDD1440_FindDevices ;
   DD1440_GetErrorText : TDD1440_GetErrorText ;
@@ -587,11 +593,6 @@ begin
      FADCMinSamplingInterval := ADCMinSamplingInterval ;
      FADCMaxSamplingInterval := ADCMaxSamplingInterval ;
 
-     ADCBufferLimit := Min( DeviceInfo[0].InputBufferSamples,DD1440_MaxADCSamples ) ;
-     // A/D sample buffer limit reduced to 75% of maz. to allow for
-     // dump buffer at end of sweeps
-     ADCBufferLimit := 256*(round(ADCBufferLimit*0.75) div 256) ;
-
      // Upper limit of bipolar D/A voltage range
      DACMaxVolts := 10.0 ;
      FDACVoltageRangeMax := 10.0 ;
@@ -608,19 +609,15 @@ procedure DD1440_LoadLibrary  ;
   Load AXDD1440.DLL library into memory
   -------------------------------------}
 var
-     DD1440Path : String ; // AxDD1440.DLL file path
+     DD1440Path,AxonDLL : String ; // DLL file paths
 begin
 
-     // Support DLLs loaded from program folder
-     //AxoutilsPath := ExtractFilePath(ParamStr(0)) + 'Axdd1400.DLL' ;
-     //AxoUtils32Hnd := LoadLibrary(PChar(AxoutilsPath)) ;
+     AxonDLL :=  ExtractFilePath(ParamStr(0)) + 'AxDD1400.DLL' ;
+     if not FileExists(AxonDLL) then begin
+        ShowMessage( AxonDLL + ' missing from ' + ExtractFilePath(ParamStr(0))) ;
+        end ;
 
      DD1440Path := ExtractFilePath(ParamStr(0)) + 'DD1440.DLL' ;
-
-     // Load utilities DLL
- //    Axoutils32Hnd := LoadLibrary( PChar(AxoutilsPath));
- //    if Axoutils32Hnd <= 0 then
- //       ShowMessage( format('%s library not found',[AxoutilsPath])) ;
 
      // Load main library
      LibraryHnd := LoadLibrary(PChar(DD1440Path)) ;
@@ -709,8 +706,7 @@ procedure DD1440_InitialiseBoard ;
   Initialise Digidata 1200 interface hardware
   -------------------------------------------}
 var
-   i,ch,nBufs,nPoints,iPrev,iNext,iTo,DigCh,NumPointsPerDACBuf : Integer ;
-   DACPointer : Pointer ;
+   ch : Integer ;
 begin
 
      DeviceInitialised := False ;
@@ -745,68 +741,15 @@ begin
          if Calibration.afDACGains[ch] = 0.0 then Calibration.afDACGains[ch] := 1.0 ;
      DACActive := False ;
 
-     GetMem( ADCBuf, DeviceInfo[0].InputBufferSamples*2) ;
-
-    // Initialise D/A output
-
-    // Enable all channels
-    Protocol.uAOChannels := DD1400_MAX_AO_CHANNELS ;
-    for ch := 0 to Protocol.uAOChannels-1 do Protocol.anAOChannels[ch] := ch ;
-    //Enable digital output
-    Protocol.bDOEnable := True ;
-
-    // Set analog and digital outputs to zero
-    GetMem( DACBuf, DeviceInfo[0].OutputBufferSamples*4) ;
-    GetMem( OutValues, DeviceInfo[0].OutputBufferSamples*4) ;
-    NumOutChannels :=  DD1400_MAX_AO_CHANNELS + 1 ;
-    DigCh := DD1400_MAX_AO_CHANNELS ;
-    NumOutPoints := DeviceInfo[0].OutputBufferSamples div NumOutChannels ;
-    NumPointsInDACBuf := NumOutPoints ;
-
     // Set output buffers to default values
+    NumOutChannels := DD1400_MAX_AO_CHANNELS + 1 ;
     for ch := 0 to DD1400_MAX_AO_CHANNELS-1 do DACDefaultValue[ch] := -Calibration.anDACOffsets[ch];
     DIGDefaultValue := 0 ;
-    DD1440_FillOutputBufferWithDefaultValues ;
 
-     // Create D/A buffer table
+    AIBuf := Nil ;
+    AOBuf := Nil ;
 
-     DACPointer := DACBuf ;
-     nBufs := 0 ;
-     NumPointsPerDACBuf := 300 ;
-     nPoints := NumOutPoints ;
-     while nPoints > 0 do begin
-
-        DACBufs[nBufs].pnData := DACPointer ;
-        DACBufs[nBufs].uNumSamples := NumPointsPerDACBuf ; // Min(nPoints, NumPointsPerBuf) ;
-        DACBufs[nBufs].uFlags := 0 ;
-        DACBufs[nBufs].psDataFlags := Nil ;
-
-        // Pointer to data
-        DACPointer := Pointer( Cardinal(DACPointer) + (DACBufs[nBufs].uNumSamples*2) ) ;
-
-        nPoints :=  nPoints - DACBufs[nBufs].uNumSamples ;
-
-        Inc(nBufs) ;
-
-        if nBufs > High(DACBufs) then Break ;
-
-        end ;
-
-     // Previous/Next buffer pointers
-     for i := 0 to nBufs-1 do begin
-         iPrev := i-1 ;
-         if iPrev < 0 then iPrev := nBufs-1 ;
-         DACBufs[i].pPrevBuffer := Pointer( Cardinal(@DACBufs) + (iPrev*SizeOf(TDATABuffer)) ) ;
-         iNext := i+1 ;
-         if iNext >= nBufs then iNext := 0 ;
-         DACBufs[i].pNextBuffer := Pointer( Cardinal(@DACBufs) + (iNext*SizeOf(TDATABuffer)) ) ;
-         end ;
-
-     // No. of buffers to output
-     Protocol.uAOBuffers := nBufs ;
-     Protocol.pAOBuffers := @DACBufs ;
-
-     DeviceInitialised := True ;
+    DeviceInitialised := True ;
 
      end ;
 
@@ -816,26 +759,21 @@ procedure DD1440_FillOutputBufferWithDefaultValues ;
 // Fill output buffer with default values
 // --------------------------------------
 var
-    i,iTo,ch,DigCh : Integer ;
+    i,ch,DIGChannel : Integer ;
 begin
 
-    // Output buffer
-    DigCh := NumOutChannels - 1 ;
-    for i := 0 to NumOutPoints-1 do begin
-        iTo := i*NumOutChannels ;
-        for ch := 0 to DD1400_MAX_AO_CHANNELS-1 do begin
-            OutValues^[iTo+ch] := 0;//DACDefaultValue[ch]
-            end ;
-        OutValues^[iTo+DigCh] := DIGDefaultValue ;
-        end ;
-
     // Circular transfer buffer
-    for i := 0 to NumPointsInDACBuf-1 do begin
-        iTo := i*NumOutChannels ;
-        for ch := 0 to DD1400_MAX_AO_CHANNELS-1 do begin
-   //         DACBuf^[iTo+ch] := DACDefaultValue[ch]
-            end ;
-  //      DACBuf^[iTo+DigCh] := DIGDefaultValue ;
+    ch := 0 ;
+    DIGChannel := NumOutChannels - 1 ;
+    for i := 0 to AOBufNumSamples-1 do begin
+        if ch < DIGChannel then begin
+           AOBuf^[i] := DACDefaultValue[ch] ;
+           inc(ch) ;
+           end
+        else begin
+           AOBuf^[i] := DIGDefaultValue ;
+           ch := 0 ;
+           end ;
         end ;
 
     end ;
@@ -846,7 +784,7 @@ procedure DD1440_ConfigureHardware(
 
   -------------------------------------------------------------------------- }
 begin
-     EmptyFlag := EmptyFlagIn ;
+     //EmptyFlag := EmptyFlagIn ;
      end ;
 
 
@@ -862,22 +800,21 @@ function DD1440_ADCToMemory(
 { -----------------------------
   Start A/D converter sampling
   -----------------------------}
-
+const
+    MaxSamplesPerSubBuf = 60 ;
 var
    i : Word ;
-   ch,nBufs,nPoints,iPrev,iNext : Integer ;
-   ADCPointer : Pointer ;
+   ch,iPrev,iNext : Integer ;
+   NumSamplesPerSubBuf : Integer ;
+   iPointer : Cardinal ;
 begin
      Result := False ;
      if not DeviceInitialised then DD1440_InitialiseBoard ;
      if not DeviceInitialised then Exit ;
 
      // Initialise A/D buffer pointers used by DD1440_GetADCSamples
-     FADCPointer := 0 ;
-     FADCBuf := 0 ;
      FOutPointer := 0 ;
      FNumSamplesRequired := NumADCChannels*NumADCSamples ;
-     FADCSweepDone := False ;
 
      // Clear protocol fClags
      Protocol.uFlags := 0 ;
@@ -889,62 +826,74 @@ begin
      Protocol.uAIChannels := NumADCChannels ;
      for ch := 0 to Protocol.uAIChannels-1 do Protocol.anAIChannels[ch] := ch ;
 
-     // Allocate A/D data Buffers
-     FADCBufNumSamples := ((DeviceInfo[0].InputBufferSamples div 4) div NumADCChannels)*NumADCChannels ;
-     Protocol.pAIBuffers := @ADCBufs ;
+     // Allocate A/D input buffers
 
-     ADCPointer := ADCBuf ;
-     nPoints := FADCBufNumSamples ;
-     nBufs := 0 ;
-     while nPoints > 0 do begin
+     // Make sub-buffer contain multiple of both input and output channels
+     NumSamplesPerSubBuf := MaxSamplesPerSubBuf*NumADCChannels*NumOutChannels ;
 
-        ADCBufs[nBufs].pnData := ADCPointer ;
-        ADCBufs[nBufs].uNumSamples := Min(nPoints,NumPointsPerBuf) ;
-        ADCBufs[nBufs].uFlags := 0 ;
-        ADCBufs[nBufs].psDataFlags := Nil ;
+     AIBufNumSamples := ((DeviceInfo[0].InputBufferSamples*2) div NumSamplesPerSubBuf)*NumSamplesPerSubBuf ;
+     if AIBuf <> Nil then FreeMem(AIBuf) ;
+     GetMem( AIBuf, AIBufNumSamples*2 ) ;
+     Protocol.pAIBuffers := @AIBufs ;
 
-        // Pointer to data
-        ADCPointer := Pointer( Cardinal(ADCPointer) + (ADCBufs[nBufs].uNumSamples*2) ) ;
-
-        nPoints :=  nPoints - ADCBufs[nBufs].uNumSamples ;
-
-        Inc(nBufs) ;
-
-        if nBufs > High(ADCBufs) then Break ;
-
-        // Pointer to data
-        ADCPointer := Pointer( Cardinal(ADCPointer) + (ADCBufs[nBufs].uNumSamples*2) ) ;
-
-        nPoints :=  nPoints - ADCBufs[nBufs].uNumSamples ;
-
-        Inc(nBufs) ;
-
+     iPointer := Cardinal(AIBuf) ;
+     Protocol.uAIBuffers := Min( AIBufNumSamples div NumSamplesPerSubBuf, High(AIBufs)+1 );
+     for i := 0 to Protocol.uAIBuffers-1 do begin
+        AIBufs[i].pnData := Pointer(iPointer) ;
+        AIBufs[i].uNumSamples := NumSamplesPerSubBuf ;
+        AIBufs[i].uFlags := 0 ;
+        AIBufs[i].psDataFlags := Nil ;
+        iPointer := iPointer + NumSamplesPerSubBuf*2  ;
         end ;
 
      // Previous/Next buffer pointers
-     for i := 0 to nBufs-1 do begin
+     for i := 0 to Protocol.uAIBuffers-1 do begin
          iPrev := i-1 ;
-         if iPrev < 0 then iPrev := nBufs-1 ;
-         ADCBufs[i].pPrevBuffer := Pointer( Cardinal(@ADCBufs) + (iPrev*SizeOf(TDATABuffer)) ) ;
+         if iPrev < 0 then iPrev := Protocol.uAIBuffers-1 ;
+         AIBufs[i].pPrevBuffer := Pointer( Cardinal(@AIBufs) + (iPrev*SizeOf(TDATABuffer)) ) ;
          iNext := i+1 ;
-         if iNext >= nBufs then iNext := 0 ;
-         ADCBufs[i].pNextBuffer := Pointer( Cardinal(@ADCBufs) + (iNext*SizeOf(TDATABuffer)) ) ;
+         if iNext >= Protocol.uAIBuffers then iNext := 0 ;
+         AIBufs[i].pNextBuffer := Pointer( Cardinal(@AIBufs) + (iNext*SizeOf(TDATABuffer)) ) ;
          end ;
 
-     // No. of buffers to collect
-     Protocol.uAIBuffers := nBufs ;
+     // Allocate AO buffer
+
+     AOBufNumSamples := ((DeviceInfo[0].OutputBufferSamples*2) div NumSamplesPerSubBuf)*NumSamplesPerSubBuf ;
+     if AOBuf <> Nil then FreeMem(AOBuf) ;
+     GetMem( AOBuf, AOBufNumSamples*2 ) ;
+     Protocol.pAOBuffers := @AOBufs ;
+
+     iPointer := Cardinal(AOBuf) ;
+     Protocol.uAOBuffers := Min( AOBufNumSamples div NumSamplesPerSubBuf, High(AOBufs)+1 );
+     for i := 0 to Protocol.uAOBuffers-1 do begin
+        AOBufs[i].pnData := Pointer(iPointer) ;
+        AOBufs[i].uNumSamples := NumSamplesPerSubBuf ;
+        AOBufs[i].uFlags := 0 ;
+        AOBufs[i].psDataFlags := Nil ;
+        iPointer := iPointer + NumSamplesPerSubBuf*2  ;
+        end ;
+
+     // Previous/Next buffer pointers
+     for i := 0 to Protocol.uAOBuffers-1 do begin
+         iPrev := i-1 ;
+         if iPrev < 0 then iPrev := Protocol.uAOBuffers-1 ;
+         AOBufs[i].pPrevBuffer := Pointer( Cardinal(@AOBufs) + (iPrev*SizeOf(TDATABuffer)) ) ;
+         iNext := i+1 ;
+         if iNext >= Protocol.uAOBuffers then iNext := 0 ;
+         AOBufs[i].pNextBuffer := Pointer( Cardinal(@AOBufs) + (iNext*SizeOf(TDATABuffer)) ) ;
+         end ;
+
+     // Enable all analog O/P channels and digital channel
+     Protocol.uAOChannels := DD1400_MAX_AO_CHANNELS ;
+     for ch := 0 to Protocol.uAOChannels-1 do Protocol.anAOChannels[ch] := ch ;
+     Protocol.bDOEnable := True ;
 
      // No digital input
      Protocol.bDIEnable := False ;
-
-     // Clear any existing analog output channels & buffers
-     //Protocol.uAOChannels := 0 ;
-     //Protocol.uAOBuffers := 0 ;
-     //Protocol.bDOEnable := False ;
      Protocol.uChunksPerSecond := 20 ;
      Protocol.uTerminalCount := NumADCSamples ;
 
-     FADCBufSamplePointer := 0 ;
+     AIPointer := 0 ;
      FOutPointer := 0 ;
 
      // Stop on terminal count no longer used because it caused spurious -10V
@@ -957,10 +906,19 @@ begin
 
      // Start acquisition if waveform generation not required
      if TriggerMode <> tmWaveGen then begin
+
+        // Clear any existing waveform from output buffer
+        DD1440_FillOutputBufferWithDefaultValues ;
+
         // Send protocol to device
+        AOPointer := 0 ;
         DD1440_CheckError(DD1440_SetProtocol(Protocol)) ;
         // Start A/D conversion
         DD1440_CheckError(DD1440_StartAcquisition) ;
+        DD1440_GetAOPosition(  AOPosition ) ;
+        ADCActive := True ;
+        DACActive := False ;
+        AIPosition := 0 ;
         end ;
 
      end ;
@@ -976,7 +934,9 @@ begin
      if not DeviceInitialised then Exit ;
 
      // Stop A/D input (and D/A output) if in progress
-     if DD1440_IsAcquiring then DD1440_StopAcquisition ;
+     if DD1440_IsAcquiring then begin
+        DD1440_StopAcquisition ;
+        end ;
 
      // Fill D/A & digital O/P buffers with default values
      DD1440_FillOutputBufferWithDefaultValues ;
@@ -993,53 +953,89 @@ procedure DD1440_GetADCSamples(
           var OutBufPointer : Integer       { Latest sample pointer [OUT]}
           ) ;
 var
-    n64 : int64 ;
-    NewADCBufSamplePointer : Integer ;
+    i,MaxOutPointer,NewPoints,NewSamples : Integer ;
+    NewAOPosition,NewAIPosition : Int64 ;
 begin
 
+     if not ADCActive then exit ;
 
-     DD1440_GetAIPosition(  n64 ) ;
+     // Transfer new A/D samples to host buffer
 
-     NewADCBufSamplePointer := n64 ;
+     DD1440_GetAIPosition(  NewAIPosition ) ;
+     NewSamples := (NewAIPosition - AIPosition)*Protocol.uAIChannels ;
+     AIPosition := NewAIPosition ;
      if FCircularBuffer then begin
         // Circular buffer mode
-        while (FADCBufSamplePointer <> NewADCBufSamplePointer) do begin
-            OutBuf[FOutPointer] := ADCBuf[FADCBufSamplePointer]  ;
-            Inc(FADCBufSamplePointer) ;
-            if FADCBufSamplePointer = FADCBufNumSamples then FADCBufSamplePointer := 0 ;
+        for i := 1 to NewSamples do begin
+            OutBuf[FOutPointer] := AIBuf[AIPointer]  ;
+            Inc(AIPointer) ;
+            if AIPointer = AIBufNumSamples then AIPointer := 0 ;
             Inc(FOutPointer) ;
             if FOutPointer >= FNumSamplesRequired then FOutPointer := 0 ;
             end ;
         end
      else begin
         // Single sweep mode
-        while (FADCBufSamplePointer <> NewADCBufSamplePointer) and
-           (FOutPointer < FNumSamplesRequired) do begin
-            OutBuf[FOutPointer] := ADCBuf[FADCBufSamplePointer]  ;
-            Inc(FADCBufSamplePointer) ;
-            if FADCBufSamplePointer = FADCBufNumSamples then FADCBufSamplePointer := 0 ;
+        for i := 1 to NewSamples do if
+            (FOutPointer < FNumSamplesRequired) then begin
+            OutBuf[FOutPointer] := AIBuf[AIPointer]  ;
+            Inc(AIPointer) ;
+            if AIPointer = AIBufNumSamples then AIPointer := 0 ;
             Inc(FOutPointer) ;
             end ;
         OutBufPointer := FOutPointer ;
         end ;
-     outputdebugstring(pchar(format( '%d %d %d',[FOutPointer,FADCBufSamplePointer,n64]))) ;
+     //outputdebugstring(pchar(format( '%d %d %d',[FOutPointer,FAIBufsamplePointer,n64]))) ;
+
+     // Update D/A + Dig output buffer
+     DD1440_GetAOPosition(  NewAOPosition ) ;
+     NewPoints := Integer(NewAOPosition - AOPosition) ;
+     AOPosition := NewAOPosition ;
+
+     if DACActive then begin
+       // Copy into transfer buffer
+       MaxOutPointer := (NumOutPoints*NumOutChannels) - 1 ;
+       for i := 0 to NewPoints*NumOutChannels-1 do begin
+          AOBuf^[AOPointer] := OutValues^[OutPointer] ;
+          Inc(AOPointer) ;
+          if AOPointer >= AOBufNumSamples then AOPointer := 0 ;
+          Inc(OutPointer) ;
+          if OutPointer > MaxOutPointer then begin
+             if AORepeatWaveform then OutPointer := 0
+                                 else OutPointer := OutPointer - NumOutChannels ;
+             end ;
+          end ;
+        end ;
+
+  //   else begin
+  //      AOPointer := AOPointer + NewPoints*NumOutChannels ;
+        //outputdebugstring(pchar(format('%d %d %d %d',[AOPointer,NewPoints,OutPointer,MaxOutPointer]))) ;
+    //    if AOPointer >= AOBufNumSamples then AOPointer := AOPointer - AOBufNumSamples ;
+     //    end ;
      end ;
 
 
 procedure DD1440_CheckSamplingInterval(
-          var SamplingInterval : Double ) ;
+          var SamplingInterval : Double ;
+          ADCNumChannels : Integer ) ;
 { ---------------------------------------------------
   Convert sampling period from <SamplingInterval> (in s) into
   clocks ticks, Returns no. of ticks in "Ticks"
   ---------------------------------------------------}
-begin
+var
+  MinInterval : Double ;
+  begin
+
+  // Minimum sampling interval increased when more than 4 channels acquired
+  // (Digidata 1440 appears unable to sustain maximum sampling rate when more than 4 channels in use)
+
+  MinInterval := ((ADCNumChannels div 4) + 1)*DeviceInfo[0].MinSequencePeriodUS*1E-6 ;
+
+  SamplingInterval := Max( SamplingInterval, MinInterval ) ;
+  SamplingInterval := Min( SamplingInterval, DeviceInfo[0].MaxSequencePeriodUS*1E-6 ) ;
 
   SamplingInterval := Max(Round(SamplingInterval/(DeviceInfo[0].SequenceQuantaUS*1E-6)),1) ;
   SamplingInterval := SamplingInterval*DeviceInfo[0].SequenceQuantaUS*1E-6 ;
-
-  SamplingInterval := Max( SamplingInterval, DeviceInfo[0].MinSequencePeriodUS*1E-6 ) ;
-  SamplingInterval := Min( SamplingInterval, DeviceInfo[0].MaxSequencePeriodUS*1E-6 ) ;
-
 	end ;
 
 
@@ -1058,19 +1054,22 @@ function  DD1440_MemoryToDACAndDigitalOut(
   spurious digital O/P changes between records
   --------------------------------------------------------------}
 var
-   i,ch,iTo,iFrom,DigCh : Integer ;
-begin
+   i,ch,iTo,iFrom,DigCh,MaxOutPointer : Integer ;
+   begin
 
     Result := False ;
     if not DeviceInitialised then DD1440_InitialiseBoard ;
     if not DeviceInitialised then Exit ;
 
-    { Stop any acquisition in progress }
-    //if DD1440_IsAcquiring then DD1440_StopAcquisition ;
+    // Stop any acquisition in progress
+    if DD1440_IsAcquiring then DD1440_StopAcquisition ;
+
+    // Allocate internal output waveform buffer
     FreeMem(OutValues) ;
     NumOutPoints := NumDACPoints ;
     GetMem( OutValues, NumOutPoints*NumOutChannels*2 ) ;
-    // Copy D/A & digital values into internal output buffer
+
+    // Copy D/A & digital values into internal buffer
     DigCh := NumOutChannels - 1 ;
     for i := 0 to NumDACPoints-1 do begin
         iTo := i*NumOutChannels ;
@@ -1080,25 +1079,13 @@ begin
                OutValues[iTo+ch] := Round( DACValues[iFrom+ch]/Calibration.afDACGains[ch])
                                      - Calibration.anDACOffsets[ch];
                end
-            else OutValues[iTo+ch] := 0 ;
+            else OutValues[iTo+ch] := DACDefaultValue[ch] ;
             end ;
-        OutValues^[iTo+DigCh] := DigValues[i];
+        if DigitalInUse then OutValues^[iTo+DigCh] := DigValues[i]
+                        else  OutValues^[iTo+DigCh] := DIGDefaultValue ;
         end ;
 
-    // Copy into transfer buffer
-    iTo := 0 ;
-    OutPointer := 0 ;
-    for i := 0 to NumPointsInDACBuf-1 do begin
-        for ch := 0 to NumOutChannels-1 do begin
-            DACBuf^[iTo+ch] := OutValues[OutPointer+ch] ;
-            end ;
-       iTo := iTo + NumOutChannels ;
-       OutPointer := OutPointer + NumOutChannels ;
-       if OutPointer >= NumOutPoints then begin
-          if RepeatWaveform then OutPointer := 0
-                            else OutPointer := OutPointer - NumOutChannels ;
-          end ;
-       end ;
+    // Download protocol to DD1440 and start/restart acquisition
 
     // If ExternalTrigger flag is set make D/A output wait for
     // TTL pulse on Trigger In line
@@ -1106,15 +1093,42 @@ begin
     if ExternalTrigger then
        Protocol.uFlags := Protocol.uFlags or DD1400_FLAG_EXT_TRIGGER ;
 
-    // Download protocol to DD1440 and start acquisition
-    // (if it is not already running)
-    if not DD1440_IsAcquiring then begin
-       DD1440_SetProtocol(  Protocol ) ;
-       DD1440_StartAcquisition ;
-       DACActive := True ;
-       ADCActive := True ;
-       end ;
+    // Fill buffer with data from new waveform
+    OutPointer := 0 ;
+    MaxOutPointer := (NumOutPoints*NumOutChannels) - 1 ;
+    for i := 0 to AOBufNumSamples-1 do begin
+        AOBuf^[i] := OutValues^[OutPointer] ;
+        Inc(OutPointer) ;
+        if OutPointer > MaxOutPointer then begin
+           if RepeatWaveform then OutPointer := 0
+                             else OutPointer := OutPointer - NumOutChannels ;
+           end ;
+        end ;
 
+    // Load protocol
+    DD1440_SetProtocol(  Protocol ) ;
+    // Start
+    DD1440_StartAcquisition ;
+
+    ADCActive := True ;
+
+    // Reload transfer buffer (replacing data preloaded into 1440 by DD1440_StartAcquisition)
+    DD1440_GetAOPosition(  AOPosition ) ;
+    AIPosition := 0 ;
+    AIPointer := 0 ;
+    AOPointer := 0 ;
+    for i := 1 to AOPosition*NumOutChannels do begin
+        AOBuf^[AOPointer] := OutValues^[OutPointer] ;
+        Inc(OutPointer) ;
+        Inc(AOPointer) ;
+        if OutPointer > MaxOutPointer then begin
+           if RepeatWaveform then OutPointer := 0
+                             else OutPointer := OutPointer - NumOutChannels ;
+           end ;
+        end ;
+
+    AORepeatWaveform := RepeatWaveform ;
+    DACActive := True ;
     Result := DACActive ;
 
     end ;
@@ -1133,10 +1147,9 @@ begin
 
 
 function DD1440_StopDAC : Boolean ;
-{ ---------------------------------
-  Note D/A output cannot be stopped independently of A/D sampling
-
-  ---------------------------------}
+//---------------------------------
+//  Stop D/A & digital waveforms
+//---------------------------------
 begin
      Result := False ;
      if not DeviceInitialised then DD1440_InitialiseBoard ;
@@ -1144,6 +1157,16 @@ begin
 
      // Set DAC and digital outputs to default values
      DD1440_FillOutputBufferWithDefaultValues ;
+
+     if DD1440_IsAcquiring then begin
+        DD1440_StopAcquisition ;
+        DD1440_StartAcquisition ;
+        AIPosition := 0 ;
+        AOPosition := 0 ;
+        AIPointer := 0 ;
+        end ;
+
+     DACActive := False ;
      Result := DACActive ;
 
      end ;
@@ -1184,14 +1207,28 @@ begin
          if DACValue < MinDACValue then DACValue := MinDACValue ;
          // Output D/A value
          SmallDACValue := DACValue ;
-         DD1440_SetAOValue(  ch, SmallDACValue ) ;
+         if not ADCActive then DD1440_SetAOValue(  ch, SmallDACValue ) ;
          DACDefaultValue[ch] := SmallDACValue ;
 
          end ;
 
      // Set digital outputs
-     DD1440_SetDOValue(  DigValue ) ;
+     if not ADCActive then DD1440_SetDOValue(  DigValue ) ;
      DIGDefaultValue := DigValue ;
+
+     // Fill D/A & digital O/P buffers with default values
+     DD1440_FillOutputBufferWithDefaultValues ;
+
+     // Stop/restart acquisition to flush output buffer
+     if DD1440_IsAcquiring then begin
+        DD1440_StopAcquisition ;
+        DD1440_StartAcquisition ;
+        AIPosition := 0 ;
+        AOPosition := 0 ;
+        AIPointer := 0 ;
+        end ;
+
+
      end ;
 
 
@@ -1245,8 +1282,8 @@ begin
      if LibraryHnd > 0 then FreeLibrary( LibraryHnd ) ;
 
      FreeMem( OutValues ) ;
-     FreeMem( DACBuf ) ;
-     FreeMem( ADCBuf ) ;
+     FreeMem( AOBuf ) ;
+     FreeMem( AIBuf ) ;
      DeviceInitialised := False ;
      DACActive := False ;
      ADCActive := False ;
@@ -1269,10 +1306,10 @@ begin
      end ;
 
 
-function TrimChar( Input : Array of Char ) : string ;
+function TrimChar( Input : Array of ANSIChar ) : string ;
 var
    i : Integer ;
-   pInput : PChar ;
+   pInput : PANSIChar ;
 begin
      pInput := @Input ;
      Result := '' ;

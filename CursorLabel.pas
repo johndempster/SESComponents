@@ -16,7 +16,6 @@ type
   private
     { Private declarations }
     FLines : TStringList ;    // Lines of text displayed by label
-    FFont : TFont ;           // Typeface used to display text
     FAlignment : TAlignment ; // Alignment of text within label
   protected
     { Protected declarations }
@@ -124,7 +123,7 @@ begin
               taLeftJustify : Begin
                 x := Canvas.TextWidth('X') ;
                 end ;
-              taRightJustify : Begin
+              else Begin
                 x := Width - Canvas.TextWidth(FLines.Strings[i]+'X') ;
                 end ;
               end ;
