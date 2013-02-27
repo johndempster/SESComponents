@@ -9,13 +9,14 @@ unit CurveFitter;
 interface
 
 uses
-  SysUtils, Classes, COmCtrls, SHDocVw, Dialogs ;
+  SysUtils, Classes, COmCtrls, SHDocVw ;
 
 const
      ChannelLimit = 7 ;
      LastParameter = 11 ;
      MaxBuf = 32768 ;
      MaxWork = 9999999 ;
+     HalfPi = Pi/2.0;
 
 type
     TWorkArray = Array[0..MaxWork] of Single ;
@@ -49,7 +50,8 @@ type
                  DecayingExp3,
                  Boltzmann,
                  PowerFunc,
-                 SinSqrd ) ;
+                 SinSqrd,
+                 CosSqrd ) ;
 
     TPars = record
           Value : Array[0..LastParameter+1] of Single ;
@@ -88,8 +90,6 @@ type
     DegreesOfFreedomValue : Integer ; { Statistical deg's of freedom }
     IterationsValue : Integer ;    // No. of iterations to achieve fit
     GoodFitFlag : Boolean ;        // Fit has been successful flag
-
-    HalfPi: Double;
 
     Procedure SetupNormalisation( xScale : single ; yScale : single ) ;
     function NormaliseParameter( Index : Integer ; Value : single ) : single ;
@@ -258,8 +258,6 @@ begin
      FYUnits := '' ;
      nPoints := 0 ;
 
-     HalfPi := Pi/2.0;
-
      end ;
 
 
@@ -391,6 +389,10 @@ begin
           PowerFunc : Name := 'y(x) = Ax<sup>B</sup>' ;
 
           SinSqrd: Name := 'y(x) = Amp sin<sup>2</sup> [(pi/2)(x - '
+                                   + 'V<sub>b</sub>)/V<sub>pi</sub>] + '
+                                   + 'P<sub>min</sub>';
+
+          CosSqrd: Name := 'y(x) = Amp cos<sup>2</sup> [(pi/2)(x - '
                                    + 'V<sub>b</sub>)/V<sub>pi</sub>] + '
                                    + 'P<sub>min</sub>';
 
@@ -540,6 +542,7 @@ begin
           Boltzmann : nPars := 4 ;
           PowerFunc : nPars := 2 ;
           SinSqrd: nPars := 4;
+          CosSqrd: nPars := 4;
           else nPars := 0 ;
           end ;
      Result := nPars ;
@@ -783,6 +786,13 @@ begin
                      ParNames[3] := 'P<sub>min</sub>';
                    end;
 
+          CosSqrd: begin
+                     ParNames[0] := 'V<sub>pi</sub>';
+                     ParNames[1] := 'V<sub>b</sub>';
+                     ParNames[2] := 'Amp';
+                     ParNames[3] := 'P<sub>min</sub>';
+                   end;
+
           else begin
                end ;
           end ;
@@ -975,6 +985,13 @@ begin
                      ParUnits[2] := FYUnits;
                      ParUnits[3] := FYUnits;
                    end;
+
+          CosSqrd: begin
+                     ParUnits[0] := FXUnits;
+                     ParUnits[1] := FXUnits;
+                     ParUnits[2] := FYUnits;
+                     ParUnits[3] := FYUnits;
+                   end;
           else begin
                end ;
           end ;
@@ -1151,6 +1168,11 @@ begin
           SinSqrd: begin
                      Arg := HalfPi * (X - Pars[1]) / Pars[0];
                      Y := Pars[2] * Sin(Arg) * Sin(Arg) + Pars[3];
+                   end;
+
+          CosSqrd: begin
+                     Arg := HalfPi * (X - Pars[1]) / Pars[0];
+                     Y := Pars[2] * Cos(Arg) * Cos(Arg) + Pars[3];
                    end;
           else Y := 0. ;
           end ;
@@ -1631,6 +1653,21 @@ begin
                       LogPars[3] := False;
                       ParameterScaleFactors[3] := yScale;
                     end;
+
+           CosSqrd: begin
+                      AbsPars[0] := False;
+                      LogPars[0] := False;
+                      ParameterScaleFactors[0] := xScale;
+                      AbsPars[1] := False;
+                      LogPars[1] := False;
+                      ParameterScaleFactors[1] := xScale;
+                      AbsPars[2] := False;
+                      LogPars[2] := False;
+                      ParameterScaleFactors[2] := yScale;
+                      AbsPars[3] := False;
+                      LogPars[3] := False;
+                      ParameterScaleFactors[3] := yScale;
+                    end;
           end ;
 
      Normalised := True ;
@@ -2011,6 +2048,13 @@ begin
            SinSqrd: begin
                       Guess[0] := XAtYmax;
                       Guess[1] := XAtYmin;
+                      Guess[2] := YMax - YMin;
+                      Guess[3] := YMin;
+                    end;
+
+           CosSqrd: begin
+                      Guess[0] := XAtYmin;
+                      Guess[1] := XAtYmax;
                       Guess[2] := YMax - YMin;
                       Guess[3] := YMin;
                     end;
