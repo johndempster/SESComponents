@@ -1002,10 +1002,14 @@ begin
      Canv.Font.Size := FFontSize ;
      Canv.Font.Color := FTraceColor ;
      ChannelSpacing :=  Canv.TextHeight('X') + 1  ;
-     AvailableHeight := Height - ((NumInUse+1)*ChannelSpacing)
+     {AvailableHeight := Height - ((NumInUse+1)*ChannelSpacing)
                         - 2*Canv.TextHeight('X')
                         - ((FNumChannels - NumInUse)*ButtonSize)
-                        - 4 - ButtonSize ;
+                        - 4 - ButtonSize ;}
+     AvailableHeight := Height - ((FNumChannels)*ChannelSpacing)
+                        - 2*Canv.TextHeight('X')
+                        - ((FNumChannels - NumInUse)*ButtonSize)
+                        - 4;
 
      { Define display area for each channel in use }
      cTop := 4 ;
@@ -1037,8 +1041,10 @@ begin
             end
          else begin
             Channel[ch].Top := cTop ;
-            Channel[ch].Bottom := Channel[ch].Top + ChannelSpacing ;
-            cTop := cTop + ChannelSpacing ;
+            // Channel[ch].Bottom := Channel[ch].Top + ChannelSpacing ;
+            Channel[ch].Bottom := Channel[ch].Top + ButtonSize;
+            // cTop := cTop + ChannelSpacing;
+            cTop := cTop + ButtonSize + ChannelSpacing;
             FBottomOfDisplayArea := Channel[ch].Bottom ;
             end ;
 
