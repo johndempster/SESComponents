@@ -965,6 +965,7 @@ const
     TickMultipliers : array[0..6] of Integer = (1,2,5,10,20,50,100) ;
 var
    CTop,ch,i,NumInUse,AvailableHeight,ChannelHeight,ChannelSpacing,LastActiveChannel : Integer ;
+   UsedHeight, ButtonSpacing: Integer;
    Lab : string ;
    x,xPix,y,yPix : Integer ;
    dy,dx : Single ;
@@ -1002,17 +1003,46 @@ begin
      Canv.Font.Size := FFontSize ;
      Canv.Font.Color := FTraceColor ;
      ChannelSpacing :=  Canv.TextHeight('X') + 1  ;
+     cTop := 18;
+
+     ButtonSpacing := 0;
+     UsedHeight := cTop + 3*Canv.TextHeight('X') + 5 +
+                   ((FNumChannels - NumInUse)*ButtonSize);
+     if Channel[0].InUse then
+       UsedHeight := UsedHeight + (ChannelSpacing div 2)
+     else
+       UsedHeight := UsedHeight + (ButtonSpacing div 2);
+     if FNumChannels = 1 then
+     begin
+       {If only one channel is in use, the original problem still occurs:
+        the channel x axis is too high, and the top resize button is cutoff.
+        This correction makes AvailableHeight a bit bigger.}
+       cTop := cTop - 10;
+       UsedHeight := UsedHeight - Canv.TextHeight('X') - 18;
+     end else
+       for ch := 1 to FNumChannels - 2 do
+       begin
+         if Channel[ch].InUse then
+           UsedHeight := UsedHeight + ChannelSpacing
+         else
+           UsedHeight := UsedHeight + ButtonSpacing;
+       end;
+     if Channel[FNumChannels - 1].InUse then
+       UsedHeight := UsedHeight + (ChannelSpacing div 2)
+     else
+       UsedHeight := UsedHeight + (ButtonSpacing div 2);
+
      {AvailableHeight := Height - ((NumInUse+1)*ChannelSpacing)
                         - 2*Canv.TextHeight('X')
                         - ((FNumChannels - NumInUse)*ButtonSize)
                         - 4 - ButtonSize ;}
-     AvailableHeight := Height - ((FNumChannels)*ChannelSpacing)
+     {AvailableHeight := Height - ((FNumChannels)*ChannelSpacing)
                         - 2*Canv.TextHeight('X')
                         - ((FNumChannels - NumInUse)*ButtonSize)
-                        - 4;
+                        - 4;}
+     AvailableHeight := Height - UsedHeight;
 
      { Define display area for each channel in use }
-     cTop := 4 ;
      FTopOfDisplayArea := cTop ;
      LastActiveChannel := 0 ;
      for ch := 0 to FNumChannels-1 do begin
@@ -1030,21 +1060,33 @@ begin
          if Channel[ch].InUse then begin
             LastActiveChannel := Ch ;
             ChannelHeight := Round((Channel[ch].YSize/YTotal)*AvailableHeight) ;
-            Channel[ch].Top := cTop ;
+            if ch = 0 then
+              Channel[ch].Top := cTop
+            else
+              Channel[ch].Top := cTop + (ChannelSpacing div 2);
             Channel[ch].Bottom := Channel[ch].Top + ChannelHeight ;
             if Channel[ch].yMax = Channel[ch].yMin then
                Channel[ch].yMax := Channel[ch].yMin + 1.0 ;
             Channel[ch].yScale := (Channel[ch].Bottom - Channel[ch].Top) /
                                   (Channel[ch].yMax - Channel[ch].yMin ) ;
-            cTop := cTop + ChannelHeight + ChannelSpacing ;
+            if ch = FNumChannels-1 then
+              cTop := cTop + ChannelHeight + (ChannelSpacing div 2)
+            else
+              cTop := cTop + ChannelHeight + ChannelSpacing;
             FBottomOfDisplayArea := Channel[ch].Bottom ;
             end
          else begin
-            Channel[ch].Top := cTop ;
+            if ch = 0 then
+              Channel[ch].Top := cTop
+            else
+              Channel[ch].Top := cTop + (ButtonSpacing div 2);
             // Channel[ch].Bottom := Channel[ch].Top + ChannelSpacing ;
             Channel[ch].Bottom := Channel[ch].Top + ButtonSize;
             // cTop := cTop + ChannelSpacing;
-            cTop := cTop + ButtonSize + ChannelSpacing;
+            if ch = FNumChannels-1 then
+              cTop := cTop + ButtonSize + (ButtonSpacing div 2)
+            else
+              cTop := cTop + ButtonSize + ButtonSpacing;
             FBottomOfDisplayArea := Channel[ch].Bottom ;
             end ;
 
