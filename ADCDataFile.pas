@@ -41,6 +41,7 @@ unit ADCDataFile;
 //          turned off fixed. (Bug reported by Trevor Smart in WinEDR files)
 // 22.07.11 Max. number of channel increased to 128
 // 14.08.12 PhysioNet file import now works correctly (supports 16 bit sample size as well as 12 bit)
+// 11.03.13 FP error on import of CHT files now fixed. FChannelADCVoltageRange[] now read from YCch#= header variable
 
 {$R 'adcdatafile.dcr'}
 interface
@@ -5425,7 +5426,10 @@ begin
          ReadFloat( Header, format('YS%d=',[ch]), FChannelScale[ch]) ;
 
          FChannelGain[ch] := 1.0 ;
-         FChannelADCVoltageRange[ch] := FADCVoltageRange ;
+         // Channel voltage range
+         FChannelADCVoltageRange[ch] := 0.0 ;
+         ReadFloat( Header, format('YC%d=',[ch]), FChannelADCVoltageRange[ch]) ;
+         if FChannelADCVoltageRange[ch] = 0.0 then FChannelADCVoltageRange[ch] := FADCVoltageRange ;
 
          // Calculate calib factor from scale factor
          FChannelCalibrationFactor[ch] := CalibFactor( ch ) ;

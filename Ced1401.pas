@@ -58,6 +58,8 @@ unit Ced1401;
                compatible with WinWCP (with stdcalls) is used
   18/9/12 .... Micro 1401 Mk3 now specifically identified.
   27/11/12 ... Micro 1401 now correctly identified again ADC host buffer reduced to 32768*2
+  16/04/13 ... CED_CheckSamplingInterval() Sampling interval now ROUNDed to nearest integer
+               clock tick rather than TRUNCated to nearest lower value.
 }
 interface
 
@@ -887,8 +889,7 @@ begin
           PreScale := PreScale*2 ;
           fTicks := dt / (ClockPeriod*PreScale) ;
           until ((fTicks < 65535.0)) ;
-     Ticks := Max(Trunc( fTicks ),1) ;
-     if (fTicks/Ticks) > 1.1 then Inc(Ticks) ;
+     Ticks := Max(round( fTicks ),1) ;
      dt := Ticks*PreScale*ClockPeriod ;
 
      end ;
