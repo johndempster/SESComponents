@@ -4145,9 +4145,9 @@ begin
   XAxisAt := Channel[LastActiveChannel].Bottom + Canv.TextHeight('X') + 2;
   KeepColor := Canv.Pen.Color;
   Canv.Pen.Color := FBackgroundColor;
-  Canv.Rectangle(Channel[0].Left - Canv.TextWidth('n'),
+  Canv.Rectangle(Channel[0].Left - 2 * Canv.TextWidth('m'),
                  Channel[LastActiveChannel].Bottom + 2,
-                 Channel[0].Right + Canv.TextWidth('n'),
+                 Channel[0].Right + 2 * Canv.TextWidth('m'),
                  Channel[LastActiveChannel].Bottom +
                                      3 * Canv.TextHeight('X'));
   Canv.Pen.Color := KeepColor;
