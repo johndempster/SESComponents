@@ -492,7 +492,7 @@ TChannel = record
     Property NumBytesPerFrame : Integer read FNumBytesPerFrame ;  // No. bytes per frame
     Property NumPixelsPerFrame : Integer read FNumPixelsPerFrame ; // No. of pixels per frame
     Property NumBytesPerPixel : Integer read FNumBytesPerPixel ;  // No. of bytes per image pixel
-    Property GreyMax : Integer read FGreyMax ;            // Minimum grey level
+    Property GreyMax : Integer read FGreyMax ;            // Maximum grey level
     Property IntensityScale : Single Read FIntensityScale Write FIntensityScale ;
     Property IntensityOffset : Single Read FIntensityOffset Write FIntensityOffset ;
     Property XResolution : Single read FXResolution write FXResolution ;  // Pixel width

@@ -49,6 +49,7 @@ unit SESCam;
  14/07/11 .... JD Adding DT Open Layers support
  30/07/12 .... JD IMAQDX_SetVideoMode removed from SetCameraADC to avoid frame size being set
                   incorrectly on program start for IMAQdx cameras
+ 02/05/13 .... JD Andor SDK3 camera support added
 
   ================================================================================ }
 {$OPTIMIZATION OFF}
@@ -58,7 +59,7 @@ interface
 uses
   Windows, Messages, SysUtils, Classes, Graphics, Controls, Forms, Dialogs, itex, imaq1394,
   pixelflyunit, SensiCamUnit, HamDCAMUnit, Math, AndorUnit, 
-  QCAMUnit, pvcam, imaqunit, nimaqdxunit, strutils, DTOpenLayersUnit ;
+  QCAMUnit, pvcam, imaqunit, nimaqdxunit, strutils, DTOpenLayersUnit, AndorSDK3Unit ;
 
 const
      { Interface cards supported }
@@ -70,7 +71,7 @@ const
      RS_PVCAM = 5 ;
      RS_PVCAM_PENTAMAX = 6 ;
      DTOL = 7 ;
-     RS_PVCAM_VC89 = 8 ;
+     AndorSDK3 = 8 ;
      RS_PVCAM_VC68 = 9 ;
      RS_PVCAM_VC56 = 10 ;
      RS_PVCAM_VC51 = 11 ;
@@ -155,6 +156,7 @@ type
     FNumBytesInFrameBuffer : Integer ;  // No. of bytes in frame buffer
     FNumBytesPerFrame : Integer ;       // No. of bytes per frame
     PFrameBuffer : PByteArray ;         // Pointer to ring buffer to store acquired frames
+    PAllocatedFrameBuffer : PByteArray ;
 
     CameraInfo : TStringList ;
     CameraGainList : TStringList ;
@@ -189,6 +191,7 @@ type
 
     // Andor fields
     AndorSession : TAndorSession ;
+    AndorSDK3Session : TAndorSDK3Session ;
 
     // QImaging
     QCAMSession : TQCAMSession ;
@@ -466,7 +469,7 @@ begin
        RS_PVCAM : Result := 'Photometrics/Princeton PVCAM' ;
        RS_PVCAM_PENTAMAX : Result := 'Princeton I-PentaMax (PVCAM)' ;
        DTOL : Result := 'Data Translation Frame Grabber' ;
-       RS_PVCAM_VC89 : Result := 'Not in use' ;
+       AndorSDK3 : Result := 'Andor SDK3 (Neo,Zyla)' ;
        RS_PVCAM_VC68 : Result := 'Not in use' ;
        RS_PVCAM_VC56 : Result := 'Not in use' ;
        RS_PVCAM_VC41 : Result := 'Not in use' ;
@@ -543,6 +546,11 @@ begin
 
      CameraReadoutSpeedList.Clear ;
      CameraReadoutSpeedList.Add( ' n/a ' ) ;
+
+     CameraModeList.Clear ;
+     CameraModeList.Add( ' n/a ' ) ;
+     CameraADCList.Clear ;
+     CameraADCList.Add( ' n/a ' ) ;
 
      case FCameraType of
 
@@ -899,6 +907,60 @@ begin
 
           end ;
 
+       ANDORSDK3 : begin
+
+          CameraInfo.Clear ;
+          AndorSDK3Session.CameraMode := FCameraMode ;
+          FCameraAvailable := AndorSDK3_OpenCamera(
+                              AndorSDK3Session,
+                              FFrameWidthMax,
+                              FFrameHeightMax,
+                              FBinFactorMax,
+                              FNumBytesPerPixel,
+                              FPixelDepth,
+                              FPixelWidth,
+                              CameraInfo ) ;
+
+         if FCameraAvailable then begin
+
+             AndorSDK3_GetCameraGainList( AndorSDK3Session, CameraGainList ) ;
+
+             AndorSDK3_GetCameraModeList( AndorSDK3Session,CameraModeList ) ;
+
+             AndorSDK3_GetCameraADCList( AndorSDK3Session, CameraADCList ) ;
+
+             // List of readout speeds
+             AndorSDK3_GetCameraReadoutSpeedList( AndorSDK3Session, CameraReadoutSpeedList ) ;
+             FReadoutSpeed := 0 ;
+             AndorSDK3Session.ReadoutSpeed := FReadoutSpeed ;
+
+             // Calculate grey levels from pixel depth
+             FGreyLevelMax := 1 ;
+             for i := 1 to FPixelDepth do FGreyLevelMax := FGreyLevelMax*2 ;
+             FGreyLevelMax := FGreyLevelMax - 1 ;
+             FGreyLevelMin := 0 ;
+             FCCDRegionReadoutAvailable := True ;
+
+             // Set temperature set point
+             AndorSDK3_SetTemperature( AndorSDK3Session, FTemperatureSetPoint ) ;
+             AndorSDK3_SetCooling( AndorSDK3Session, FCameraCoolingOn ) ;
+             AndorSDK3_SetFanMode( AndorSDK3Session, FCameraFanMode ) ;
+             AndorSDK3_SetCameraMode( AndorSDK3Session, FCameraMode ) ;
+
+             end ;
+
+
+          FFrameWidth := FFrameWidthMax ;
+          FFrameHeight := FFrameHeightMax ;
+
+          FFrameIntervalMin := 1E-3 ;
+          FFrameIntervalMax := 1000.0 ;
+
+          FPixelUnits := 'um' ;
+          FTriggerType := CamExposureTrigger ;
+
+          end ;
+
        UltimaLSM : begin
           FCameraName := 'Prairie Technology Ultima' ;
           FNumBytesPerPixel := 1 ;
@@ -1042,7 +1104,7 @@ begin
        IMAQDX : begin
 
           CameraInfo.Clear ;
-         
+
           FCameraAvailable := IMAQDX_OpenCamera(
                               IMAQDXSession,
                               FCameraMode,
@@ -1204,6 +1266,10 @@ begin
               Andor_GetImage( AndorSession ) ;
               end ;
 
+            ANDORSDK3 : begin
+              AndorSDK3_GetImage( AndorSDK3Session ) ;
+              end ;
+
             QCAM : begin
               QCAMAPI_GetImage( QCAMSession ) ;
               end ;
@@ -1276,6 +1342,10 @@ begin
 
             ANDOR : begin
               Andor_CloseCamera( AndorSession ) ;
+              end ;
+
+            ANDORSDK3 : begin
+              AndorSDK3_CloseCamera( AndorSDK3Session ) ;
               end ;
 
             QCAM : begin
@@ -1378,6 +1448,20 @@ begin
                                           ) ;
                end ;
 
+          ANDORSDK3 : begin
+              ANDORSDK3_CheckROIBoundaries( AndorSDK3Session,
+                                          FFrameLeft,
+                                          FFrameRight,
+                                          FFrameTop,
+                                          FFrameBottom,
+                                          FBinFactor,
+                                          FFrameWidthMax,
+                                          FFrameHeightMax,
+                                          FFrameWidth,
+                                          FFrameHeight,
+                                          ) ;
+               end ;
+
           QCAM : begin
               QCAMAPI_CheckROIBoundaries( QCAMSession,
                                           FReadoutSpeed,
@@ -1445,7 +1529,11 @@ begin
 
      DeallocateFrameBuffer ;
 
-     if FNumBytesInFrameBuffer > 0 then GetMem( PFrameBuffer, FNumBytesInFrameBuffer + 4096 ) ;
+     if FNumBytesInFrameBuffer > 0 then begin
+        GetMem( PFrameBuffer, FNumBytesInFrameBuffer + 4096 ) ;
+        PAllocatedFrameBuffer := PFrameBuffer ;
+        PFrameBuffer := Ptr( (Cardinal(PFrameBuffer) + 7 ) and $FFFFFFF8 ) ;
+        end ;
 
      ImageAreaChanged := False ;
 
@@ -1458,7 +1546,7 @@ procedure TSESCam.DeallocateFrameBuffer ;
 // --------------------------------
 begin
      if PFrameBuffer <> Nil then begin
-        FreeMem( PFrameBuffer ) ;
+        FreeMem( PAllocatedFrameBuffer ) ;
         PFrameBuffer := Nil ;
         end ;
      end ;
@@ -1622,6 +1710,27 @@ begin
           FTemperature := AndorSession.Temperature ;
           end ;
 
+       ANDORSDK3 : begin
+          // Note Andor cameras do not support additional readout time
+          FCameraActive := AndorSDK3_StartCapture(
+                           AndorSDK3Session,
+                           FFrameInterval,
+                           FAmpGain,
+                           FTriggerMode,
+                           FFrameLeft,
+                           FFrameTop,
+                           FFrameWidth*FBinFactor,
+                           FFrameHeight*FBinFactor,
+                           FBinFactor,
+                           PFrameBuffer,
+                           FNumFramesInBuffer,
+                           FNumBytesPerFrame,
+                           FReadoutTime
+                           ) ;
+          FrameCounter := 0 ;
+          FTemperature := AndorSDK3Session.Temperature ;
+          end ;
+
        QCAM : begin
           FCameraActive := QCAMAPI_StartCapture(
                            QCAMSession,
@@ -1768,6 +1877,11 @@ begin
 
        ANDOR : begin
           Andor_StopCapture( AndorSession ) ;
+          FCameraActive := False ;
+          end ;
+
+       ANDORSDK3 : begin
+          AndorSDK3_StopCapture( AndorSDK3Session ) ;
           FCameraActive := False ;
           end ;
 
@@ -1935,6 +2049,9 @@ begin
        Andor : begin
           AndorSession.ReadoutSpeed := FReadoutSpeed ;
           end ;
+       AndorSDK3 : begin
+          AndorSDK3Session.ReadoutSpeed := FReadoutSpeed ;
+          end ;
        end ;
      end ;
 
@@ -2022,6 +2139,19 @@ begin
                                     FFrameTop,
                                     FFrameBottom,
                                     FBinFactor,
+                                    FFrameInterval,
+                                    FReadoutTime ) ;
+          end ;
+
+       ANDORSDK3 : begin
+          AndorSDK3_CheckFrameInterval( AndorSDK3Session,
+                                    FFrameLeft,
+                                    FFrameRight,
+                                    FFrameTop,
+                                    FFrameBottom,
+                                    FBinFactor,
+                                    FFrameWidthMax,
+                                    FFrameHeightMax,
                                     FFrameInterval,
                                     FReadoutTime ) ;
           end ;
@@ -2115,6 +2245,11 @@ begin
            if Result > 36 then Result := 36 ;
            end ;
 
+        AndorSDK3 : begin
+           Result :=  (20000000 div (NumPixelsPerFrame*FNumBytesPerPixel))-1 ;
+           if Result > 36 then Result := 36 ;
+           end ;
+
         RS_PVCAM : begin
            Result :=  (20000000 div (NumPixelsPerFrame*FNumBytesPerPixel))-1 ;
            end ;
@@ -2125,6 +2260,10 @@ begin
 
         IMAQ : begin
            Result :=  (20000000 div (NumPixelsPerFrame*FNumBytesPerPixel))-1 ;
+           end ;
+
+        IMAQDX : begin
+           Result :=  16 ;
            end ;
 
         QCAM : begin
@@ -2190,6 +2329,7 @@ begin
 
      case FCameraType of
           Andor : Andor_GetCameraReadoutSpeedList( AndorSession, CameraReadoutSpeedList ) ;
+          AndorSDK3 : AndorSDK3_GetCameraReadoutSpeedList( AndorSDK3Session, CameraReadoutSpeedList ) ;
           end ;
 
      List.Clear ;
@@ -2315,6 +2455,10 @@ begin
           Andor_SetTemperature( AndorSession, FTemperatureSetPoint ) ;
           end ;
 
+       ANDORSDK3 : begin
+          AndorSDK3_SetTemperature( AndorSDK3Session, FTemperatureSetPoint ) ;
+          end ;
+
        QCAM : begin
           end ;
 
@@ -2371,6 +2515,10 @@ begin
           Andor_SetCooling( AndorSession, Value ) ;
           end ;
 
+       ANDORSDK3 : begin
+          AndorSDK3_SetCooling( AndorSDK3Session, Value ) ;
+          end ;
+
        QCAM : begin
           QCAMAPI_SetCooling( QCAMSession, Value ) ;
           end ;
@@ -2425,6 +2573,10 @@ begin
 
        ANDOR : begin
           Andor_SetFanMode( AndorSession, FCameraFanMode ) ;
+          end ;
+
+       ANDORSDK3 : begin
+          AndorSDK3_SetFanMode( AndorSDK3Session, FCameraFanMode ) ;
           end ;
 
        QCAM : begin
@@ -2535,6 +2687,11 @@ begin
        ANDOR : begin
          Andor_SetCameraMode( AndorSession, FCameraMode ) ;
          end ;
+
+       ANDORSDK3 : begin
+         AndorSDK3_SetCameraMode( AndorSDK3Session, FCameraMode ) ;
+         end ;
+
        end ;
 
     end ;
@@ -2556,6 +2713,14 @@ begin
                              FPixelDepth,
                              FGreyLevelMin,
                              FGreyLevelMax ) ;
+         end ;
+
+       ANDORSDK3 : begin
+         AndorSDK3_SetCameraADC( AndorSDK3Session,
+                                 FCameraADC,
+                                 FPixelDepth,
+                                 FGreyLevelMin,
+                                 FGreyLevelMax ) ;
          end ;
        end ;
 

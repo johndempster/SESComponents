@@ -101,6 +101,7 @@ contains
   GraphicEx in 'GraphicEx.pas',
   GraphicStrings in 'GraphicStrings.pas',
   JPG in 'JPG.pas',
-  TVicLib in 'TVicLib.pas';
+  TVicLib in 'TVicLib.pas',
+  AndorSDK3Unit in 'AndorSDK3Unit.pas';
 
 end.

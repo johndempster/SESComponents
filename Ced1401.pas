@@ -60,6 +60,10 @@ unit Ced1401;
   27/11/12 ... Micro 1401 now correctly identified again ADC host buffer reduced to 32768*2
   16/04/13 ... CED_CheckSamplingInterval() Sampling interval now ROUNDed to nearest integer
                clock tick rather than TRUNCated to nearest lower value.
+  17/04/13 ... ADCMEM and MEMDAC now timed using faster hardware 'H' clock rather than standard 'C' 1 MHz clock
+               Time intervals can now be set more precisely. Appropriate clock period set when type of 1401 identified.
+               ClockSource argument added to CED_CheckSamplingInterval()
+  19/04/13 ... ClockPeriod initialised to 2.5E-7 s (investigating Motoharu Yoshida's div by 0 problem)
 }
 interface
 
@@ -132,10 +136,11 @@ procedure CED_GetADCSamples(
           var DACMinUpdateInterval : Double {Min. D/A update interval }
           ) : Boolean ;
 
- procedure CED_CheckSamplingInterval(
-           var dt : Double ;
-           var PreScale,Ticks : Word
-           ) ;
+procedure CED_CheckSamplingInterval(
+          var dt : Double ;            // Sampling Interval (returns valid value)
+          var PreScale,Ticks : Word ;  // Returns clock prescale and ticks
+          ClockSource : string         // H=hardware clock C=standard 1MHz
+          ) ;
 
   procedure CED_CheckError(
             Err : Integer
@@ -187,10 +192,6 @@ implementation
 
 uses SESLabIO ;
 
-const
-     ClockPeriod = 1E-6 ; { 1MHz clock }
-
-
 type
 
     TADCBuf = Array[0..MaxADCSamples-1] of SmallInt ;
@@ -240,6 +241,7 @@ var
    //FDACBufferLimit : Integer ;
 
    CEDVRange : Single ;
+   ClockPeriod : Double ; // Clock period used for timing A/D and D/A
 
    StartOf1401ADCBuffer : DWORD ;
    EndOf1401ADCBuffer : DWORD ;
@@ -402,6 +404,7 @@ begin
                 ADC1401BufferSize := 8192 ;            // Size of internal 1401 A/D buffer
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(100,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 2.5E-7 ;
                 end ;
              U14TYPEPLUS : begin
                 Model := 'CED 1401-plus ';
@@ -413,6 +416,7 @@ begin
                 ADC1401BufferSize := 16000 ;//65536 ;
                 DAC1401BufferSize := ADC1401BufferSize div 3 ;
                 MaxDIGTIMSlices := Min(100,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 2.5E-7 ;
                 end ;
 
              U14TYPEPOWER : begin
@@ -425,6 +429,7 @@ begin
                 ADC1401BufferSize := 4*131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 1.0E-7 ;
                 end ;
 
              U14TYPEUNKNOWN : begin
@@ -437,6 +442,7 @@ begin
                 ADC1401BufferSize := 131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 2.5E-7 ;
                 end ;
 
              U14TYPEMICRO : begin
@@ -449,6 +455,7 @@ begin
                 ADC1401BufferSize := 32768*2 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 2.5E-7 ;
                 end ;
 
              U14TYPEMICROMK2 : begin
@@ -461,6 +468,7 @@ begin
                 ADC1401BufferSize := 131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 1.0E-7 ;
                 end ;
 
              U14TYPEMICROMK3 : begin
@@ -473,6 +481,7 @@ begin
                 ADC1401BufferSize := 131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 1.0E-7 ;
                 end ;
 
              U14TYPEPOWERMK2 : begin
@@ -485,6 +494,7 @@ begin
                 ADC1401BufferSize := 4*131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 1.0E-7 ;
                 end ;
 
              else begin
@@ -497,6 +507,7 @@ begin
                 ADC1401BufferSize := 131072 ;
                 DAC1401BufferSize := ADC1401BufferSize ;
                 MaxDIGTIMSlices := Min(500,DIGTIMSlicesBufLimit) ;
+                ClockPeriod := 2.5E-7 ;
                 end ;
              end ;
 
@@ -771,12 +782,12 @@ begin
      CommandString := CommandString + ',0,' ;
 
      { Select immediate sweep or wait for trigger pulse on Event 4}
-     if TriggerMode <> tmFreeRun then CommandString := CommandString + 'CT,'
-                                 else CommandString := CommandString + 'C,' ;
+     if TriggerMode <> tmFreeRun then CommandString := CommandString + 'HT,'
+                                 else CommandString := CommandString + 'H,' ;
 
      { Set sampling clock }
      dt1 := dt / nChannels ;
-     CED_CheckSamplingInterval( dt1, PreScale, Ticks ) ;
+     CED_CheckSamplingInterval( dt1, PreScale, Ticks, 'H' ) ;
      dt := dt1 * nChannels ;
      CommandString := CommandString + format('%d,%d;',[PreScale,Ticks] );
 
@@ -877,25 +888,34 @@ begin
 
 
 procedure CED_CheckSamplingInterval(
-          var dt : Double ;
-          var PreScale,Ticks : Word
+          var dt : Double ;            // Sampling Interval (returns valid value)
+          var PreScale,Ticks : Word ;  // Returns clock prescale and ticks
+          ClockSource : string         // H=hardware clock C=standard 1MHz
           ) ;
 var
-   fTicks : Double ;
+   fTicks,Period : Double ;
 begin
+
+     if UpperCase(ClockSource) = 'H' then Period := ClockPeriod
+                                     else Period := 1E-6 ;
+     if ClockPeriod = 0.0 then begin
+        ShowMessage('Error: CED 1401 ClockPeriod=0.0! Set to 2.5E-7') ;
+        ClockPeriod := 2.5E-7 ;
+        end ;
+
      dt := max(FADCMinSamplingInterval,dt) ;
      PreScale := 1 ;
      repeat
           PreScale := PreScale*2 ;
-          fTicks := dt / (ClockPeriod*PreScale) ;
+          fTicks := dt / (Period*PreScale) ;
           until ((fTicks < 65535.0)) ;
      Ticks := Max(round( fTicks ),1) ;
-     dt := Ticks*PreScale*ClockPeriod ;
+     dt := Ticks*PreScale*Period ;
 
      end ;
 
 
-Function CED_StopADC : Boolean ;
+ Function CED_StopADC : Boolean ;
 { -------------------------------------
   Kill any A/D conversions in progress
   -------------------------------------}
@@ -983,15 +1003,15 @@ begin
      CommandString := CommandString + ',0,' ;
 
      { Set sampling clock and start D/A output }
-     CED_CheckSamplingInterval( dt, PreScale, Ticks ) ;
+     CED_CheckSamplingInterval( dt, PreScale, Ticks, 'H' ) ;
 
      if TriggerMode <> tmFreeRun then begin
         // Wait for trigger on Event 3
-        CommandString := CommandString + format('CT,%d,%d;',[PreScale,Ticks] );
+        CommandString := CommandString + format('HT,%d,%d;',[PreScale,Ticks] );
         end
      else begin
         // Start DAC output immediately
-        CommandString := CommandString + format('C,%d,%d;',[PreScale,Ticks] );
+        CommandString := CommandString + format('H,%d,%d;',[PreScale,Ticks] );
         end ;
 
      SendCommand( CommandString ) ;
@@ -1349,7 +1369,7 @@ begin
           1) clock is run at twice the D/A update rate and slice counts are doubled
           2) DIGTIM clock is gated by Event Input 2 (Active Low) }
 
-     CED_CheckSamplingInterval( dt, PreScale, Ticks ) ;
+     CED_CheckSamplingInterval( dt, PreScale, Ticks, 'C' ) ;
      Ticks := Ticks div 2 ;
      Command := format('DIGTIM,CG,%d,%d,1;',[PreScale,Ticks] );
      SendCommand( Command ) ;
@@ -1499,5 +1519,6 @@ initialization
     CircularBufferMode := false ;
     IOBuf := Nil ;
     ADCBufPointer := 0 ;
+    ClockPeriod := 2.5E-7 ;
     EmptyFlag := 32767 ;
 end.

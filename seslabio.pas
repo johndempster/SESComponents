@@ -2502,7 +2502,7 @@ begin
           FADCSamplingInterval := Min( Max( FADCSamplingInterval,
                                             FADCMinSamplingInterval),
                                             FADCMaxSamplingInterval) ;
-          CED_CheckSamplingInterval(FADCSamplingInterval,PreScale,ClockTicks);
+          CED_CheckSamplingInterval(FADCSamplingInterval,PreScale,ClockTicks,'H');
           FADCSamplingInterval := FADCSamplingInterval * FADCNumChannels ;
           end ;
        Digidata132X : begin
@@ -2995,7 +2995,7 @@ begin
           //DD_CheckSamplingInterval(FDACUpdateInterval,DD_Ticks,FrequencySource);
           end ;
        CED1401_12, CED1401_16, CED1401_10V : begin
-          CED_CheckSamplingInterval(FDACUpdateInterval,PreScale,ClockTicks);
+          CED_CheckSamplingInterval(FDACUpdateInterval,PreScale,ClockTicks,'H');
           end ;
        Digidata132X : begin
           FDACUpdateInterval := FADCSamplingInterval ;

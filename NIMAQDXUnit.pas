@@ -8,6 +8,8 @@ unit NIMAQDXUnit;
 // JD 15.12.10 Camera now closed properly when IMAQDX_CameraClose
 //             called allowing programs to shut down correctly
 // JD 30.07.12 Framewidthmax and Frameheightmax now set correctly by IMAQDX_SetVideoMode
+// JD 15.05.13 IMAQDX_SetVideoMode() Top/left of AOI set to 0,0 and biining to 1
+//             to ensure that maximum of AOI width and height correctly reported
 
 interface
 
@@ -1172,6 +1174,18 @@ begin
 
    //      If Err <> 0 then ShowMessage('Video mode error') ;
 
+      // Set top-left of AOI to 0,0 and binning to 1
+      // to ensure that maximum of AOI width and heght correctly reported
+
+      if Session.AttrXOffset >= 0 then
+         IMAQdx_SetAttribute( Session,Session.AttrXOffset, 0 ) ;
+      if Session.AttrYOffset >= 0 then
+         IMAQdx_SetAttribute( Session,Session.AttrYOffset, 0 ) ;
+      if Session.AttrXBin >= 0 then
+         IMAQdx_SetAttribute( Session,Session.AttrXBin, 1 ) ;
+      if Session.AttrYBin >= 0 then
+         IMAQdx_SetAttribute( Session,Session.AttrYBin, 1 ) ;
+
      // Max. Image width
      if Session.AttrWidth >= 0 then begin
         IMAQdxGetAttributeMaximum( Session.id,
@@ -1433,18 +1447,17 @@ begin
          ExposureTime := ExpTimeMicroSec*1E-6 ;
          end ;
 
-
-      // Set up ring buffer
-      IMAQDX_CheckError( IMAQdxConfigureAcquisition( Session.ID,
-                                                     1,
-                                                     NumFramesInBuffer)) ;
-
       // Allocate camera buffer
       if Session.Buf <> Nil then FreeMem(Session.Buf) ;
       Session.BufSize := Session.FrameWidthMax*Session.FrameHeightMax*
                          Session.NumPixelComponents*Session.NumBytesPerComponent ;
       GetMem( Session.Buf, Session.BufSize ) ;
 
+      // Set up ring buffer
+      IMAQDX_CheckError( IMAQdxConfigureAcquisition( Session.ID,
+                                                     1,
+                                                     NumFramesInBuffer)) ;
+                                                     
       Session.NumFramesInBuffer := NumFramesInBuffer ;
       Session.FrameBufPointer := PFrameBuffer ;
       Session.NumBytesPerFrame := NumBytesPerFrame ;
