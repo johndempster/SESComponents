@@ -14,6 +14,8 @@ unit dd1440;
 //          Minimum sampling interval increased when more than 4 channels acquired
 //         (Digidata 1440 appears unable to sustain maximum sampling rate when more than 4 channels in use)
 // 06.11.13 A/D input channels can now be mapped to different physical inputs
+// 20.11.13 External trigger flag now ensured to be off when acquisition restarted
+//          by WriteDac or at end of protocol.
 
 interface
 
@@ -109,8 +111,8 @@ TDD1440_Info = packed record
    VendorID : Word ;
    ProductID : Word ;
    SerialNumber : Cardinal ;
-   Name : Array[0..31] of char ;
-   FirmwareVersion : Array[0..15] of char ;
+   Name : Array[0..31] of ANSIChar ;
+   FirmwareVersion : Array[0..15] of ANSIChar ;
    InputBufferSamples : Cardinal ;
    OutputBufferSamples : Cardinal ;
    AIChannels : Cardinal ;
@@ -229,7 +231,7 @@ TDD1440_StopAcquisition =   Function  : ByteBool ;  cdecl;
 TDD1440_IsAcquiring =   Function  : ByteBool ;  cdecl;
 
 TDD1440_GetAIPosition =   Function(
-                          
+
                           var uSequences : Int64) : ByteBool ;  cdecl;
 TDD1440_GetAOPosition =   Function(
                           var uSequences : Int64) : ByteBool ;  cdecl;
@@ -245,7 +247,7 @@ TDD1440_GetDIValue = Function (
                      ) : ByteBool ;  cdecl;
 
 TDD1440_SetAOValue =   Function (
-                       
+
                        uAOChannel : Cardinal ;
                        nValue : SmallInt ) : ByteBool ;  cdecl;
 TDD1440_SetDOValue =   Function (
@@ -306,7 +308,7 @@ TDD1440_SetEepromParams =   Function (
 
 TDD1440_GetLastErrorText =   Function(
 
-                            pszMsg : PChar ;
+                            pszMsg : PANSIChar ;
                             uMsgLen : Cardinal
                             ) : ByteBool ;  cdecl;
 TDD1440_GetLastError =   Function : Integer ;  cdecl;
@@ -322,7 +324,7 @@ TDD1440_FindDevices = Function(
 
 TDD1440_GetErrorText = Function(
                        nError : Integer ;
-                       pszMsg : PChar ;
+                       pszMsg : PANSIChar ;
                        uMsgLen : Integer ) : ByteBool ; cdecl ;
 
 TDD1440_OpenDevice = Function(
@@ -470,7 +472,7 @@ var
    DACActive : Boolean ;  // D/A output in progress flag
 
    Err : Integer ;                           // Error number returned by Digidata
-   ErrorMsg : Array[0..80] of char ;         // Error messages returned by Digidata
+   ErrorMsg : Array[0..80] of ANSIChar ;         // Error messages returned by Digidata
 
    LibraryHnd : THandle ;         // axDD1440.dll library handle
    LibraryLoaded : boolean ;      // Libraries loaded flag
@@ -904,12 +906,12 @@ begin
      //if not CircularBuffer then Protocol.uFlags := Protocol.uFlags or DD1400_FLAG_STOP_ON_TC ;
      FCircularBuffer := CircularBuffer ;
 
-     // Enable external start of sweep
-     if TriggerMode = tmExtTrigger then Protocol.uFlags := Protocol.uFlags or DD1400_FLAG_EXT_TRIGGER ;
-
      // Start acquisition if waveform generation not required
      if TriggerMode <> tmWaveGen then begin
 
+        // Enable external start of sweep
+        if TriggerMode = tmExtTrigger then Protocol.uFlags := DD1400_FLAG_EXT_TRIGGER
+                                      else  Protocol.uFlags := 0 ;
         // Clear any existing waveform from output buffer
         DD1440_FillOutputBufferWithDefaultValues ;
 
@@ -1010,11 +1012,6 @@ begin
           end ;
         end ;
 
-  //   else begin
-  //      AOPointer := AOPointer + NewPoints*NumOutChannels ;
-        //outputdebugstring(pchar(format('%d %d %d %d',[AOPointer,NewPoints,OutPointer,MaxOutPointer]))) ;
-    //    if AOPointer >= AOBufNumSamples then AOPointer := AOPointer - AOBufNumSamples ;
-     //    end ;
      end ;
 
 
@@ -1093,8 +1090,8 @@ var
     // If ExternalTrigger flag is set make D/A output wait for
     // TTL pulse on Trigger In line
     // otherwise set acquisition sweep triggering to start immediately
-    if ExternalTrigger then
-       Protocol.uFlags := Protocol.uFlags or DD1400_FLAG_EXT_TRIGGER ;
+    if ExternalTrigger then Protocol.uFlags := DD1400_FLAG_EXT_TRIGGER
+                       else  Protocol.uFlags := 0 ;
 
     // Fill buffer with data from new waveform
     OutPointer := 0 ;
@@ -1163,6 +1160,8 @@ begin
 
      if DD1440_IsAcquiring then begin
         DD1440_StopAcquisition ;
+        Protocol.uFlags := 0 ;  // Ensure no wait fot ext. trigger
+        DD1440_SetProtocol( Protocol ) ; 
         DD1440_StartAcquisition ;
         AIPosition := 0 ;
         AOPosition := 0 ;
@@ -1225,6 +1224,8 @@ begin
      // Stop/restart acquisition to flush output buffer
      if DD1440_IsAcquiring then begin
         DD1440_StopAcquisition ;
+        Protocol.uFlags := 0 ;
+        DD1440_SetProtocol( Protocol ) ;
         DD1440_StartAcquisition ;
         AIPosition := 0 ;
         AOPosition := 0 ;
