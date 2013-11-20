@@ -17,7 +17,6 @@ unit itcmm;
   19/12/11 ... D/A fifo now filled by ITCMM_GetADCSamples allowing
                record buffer to be increased to MaxADCSamples div 2 (4194304)
   27/8/12 ... ITCMM_WriteDACsAndDigitalPort and ITCMM_ReadADC now disabled when ADCActive = TRUE
-  06.11.13 .. A/D input channels can now be mapped to different physical inputs
   }
 
 interface
@@ -42,10 +41,8 @@ uses WinTypes,Dialogs, SysUtils, WinProcs,mmsystem, math;
             ADCVoltageRange : Single ;
             TriggerMode : Integer ;
             ExternalTriggerActiveHigh : Boolean ;
-            CircularBuffer : Boolean ;
-            ADCChannelInputMap : Array of Integer
+            CircularBuffer : Boolean
             ) : Boolean ;
-
   function ITCMM_StopADC : Boolean ;
   procedure ITCMM_GetADCSamples (
             OutBuf : Pointer ;
@@ -1045,8 +1042,7 @@ function ITCMM_ADCToMemory(
           ADCVoltageRange : Single ;              { A/D input voltage range (V) (IN) }
           TriggerMode : Integer ;                 { A/D sweep trigger mode (IN) }
           ExternalTriggerActiveHigh : Boolean ;   // External trigger is active high
-          CircularBuffer : Boolean ;               { Repeated sampling into buffer (IN) }
-          ADCChannelInputMap : Array of Integer   // Physical A/D input channel map
+          CircularBuffer : Boolean                { Repeated sampling into buffer (IN) }
           ) : Boolean ;                           { Returns TRUE indicating A/D started }
 { -----------------------------
   Start A/D converter sampling
@@ -1142,14 +1138,14 @@ begin
 
      // Set up FIFO acquisition sequence for A/D input channels
      for ch := 0 to nChannels-1 do begin
-            if ADCChannelInputMap[ch] = 0 then Sequence[ch] := INPUT_AD0 ;
-            if ADCChannelInputMap[ch] = 1 then Sequence[ch] := INPUT_AD1 ;
-            if ADCChannelInputMap[ch] = 2 then Sequence[ch] := INPUT_AD2 ;
-            if ADCChannelInputMap[ch] = 3 then Sequence[ch] := INPUT_AD3 ;
-            if ADCChannelInputMap[ch] = 4 then Sequence[ch] := INPUT_AD4 ;
-            if ADCChannelInputMap[ch] = 5 then Sequence[ch] := INPUT_AD5 ;
-            if ADCChannelInputMap[ch] = 6 then Sequence[ch] := INPUT_AD6 ;
-            if ADCChannelInputMap[ch] = 7 then Sequence[ch] := INPUT_AD7 ;
+            if ch = 0 then Sequence[ch] := INPUT_AD0 ;
+            if ch = 1 then Sequence[ch] := INPUT_AD1 ;
+            if ch = 2 then Sequence[ch] := INPUT_AD2 ;
+            if ch = 3 then Sequence[ch] := INPUT_AD3 ;
+            if ch = 4 then Sequence[ch] := INPUT_AD4 ;
+            if ch = 5 then Sequence[ch] := INPUT_AD5 ;
+            if ch = 6 then Sequence[ch] := INPUT_AD6 ;
+            if ch = 7 then Sequence[ch] := INPUT_AD7 ;
             if ch = (nChannels-1) then Sequence[ch] := Sequence[ch] or INPUT_UPDATE ;
             end ;
      Config.Sequence := @Sequence ;

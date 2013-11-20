@@ -108,6 +108,10 @@ unit SESLabIO;
            interface settings are not saved to XML in .Destroy()
   11.02.13 No. of A/D channels now passed to DD1440_CheckSamplingInterval()
            Digidata 1440A I/O buffers increased to 8 Mbytes using circular buffer
+  07.06.13 Invalid out of range channel scaling factors prevented from cause FP errors
+  06.11.13 A/D input channels can now be mapped to different physical inputs
+           for CED 1401s, Digidatas 1320 and 1440 and ITC-16 and ITC-18
+  18.11.13 ... Stimulus support for Digidata 132X added         
   ================================================================================ }
 
 interface
@@ -1520,7 +1524,8 @@ begin
                           FADCSamplingInterval,
                           FADCVoltageRanges[FADCVoltageRangeIndex],
                           FADCTriggerMode,
-                          FADCCircularBuffer ) ;
+                          FADCCircularBuffer,
+                          FADCChannelInputNumber ) ;
              end
           else begin
              DD98_ADCToMemory( ADCBuf^,
@@ -1541,7 +1546,8 @@ begin
                            FADCVoltageRanges[FADCVoltageRangeIndex],
                            FADCTriggerMode,
                            FADCExternalTriggerActiveHigh,
-                           FADCCircularBuffer ) ;
+                           FADCCircularBuffer,
+                           FADCChannelInputNumber ) ;
 
           end ;
 
@@ -1552,7 +1558,8 @@ begin
                               FADCSamplingInterval,
                               FADCVoltageRanges[FADCVoltageRangeIndex],
                               FADCTriggerMode,
-                              FADCCircularBuffer ) ;
+                              FADCCircularBuffer,
+                              FADCChannelInputNumber ) ;
           end ;
 
        Instrutech : begin
@@ -1563,7 +1570,8 @@ begin
                              FADCVoltageRanges[FADCVoltageRangeIndex],
                              FADCTriggerMode,
                              FADCExternalTriggerActiveHigh,
-                             FADCCircularBuffer ) ;
+                             FADCCircularBuffer,
+                             FADCChannelInputNumber ) ;
           end ;
 
        ITC_16, ITC_18 : begin
@@ -1573,7 +1581,8 @@ begin
                            FADCSamplingInterval,
                            FADCVoltageRanges[FADCVoltageRangeIndex],
                            FADCTriggerMode,
-                           FADCCircularBuffer ) ;
+                           FADCCircularBuffer,
+                           FADCChannelInputNumber ) ;
           end ;
 
        VP500 : begin
@@ -1603,7 +1612,8 @@ begin
                               FADCSamplingInterval,
                               FADCVoltageRanges[FADCVoltageRangeIndex],
                               FADCTriggerMode,
-                              FADCCircularBuffer ) ;
+                              FADCCircularBuffer,
+                              FADCChannelInputNumber ) ;
           end ;
 
        Triton : begin
@@ -1744,7 +1754,8 @@ begin
                                               FDACNumSamples,
                                               DigBuf^,
                                               False,
-                                              FStimulusExtTrigger ) ;
+                                              FStimulusExtTrigger,
+                                              FDACRepeatedWaveform ) ;
              end ;
 
           Instrutech : begin
@@ -1875,7 +1886,8 @@ begin
                                               FDACNumSamples,
                                               DigBuf^,
                                               True,
-                                              FStimulusExtTrigger ) ;
+                                              FStimulusExtTrigger,
+                                              FDACRepeatedWaveform ) ;
              end ;
 
           Instrutech : begin
@@ -2025,25 +2037,27 @@ begin
           end ;
        Digidata1200 : begin
           if Win32Platform = VER_PLATFORM_WIN32_NT  then begin
-             Result := DD_ReadADC( Channel, FADCVoltageRanges[FADCVoltageRangeIndex]) ;
+             Result := DD_ReadADC( FADCChannelInputNumber[Channel],
+                                   FADCVoltageRanges[FADCVoltageRangeIndex]) ;
              end
           else begin
-             Result := DD98_ReadADC( Channel, FADCVoltageRanges[FADCVoltageRangeIndex]) ;
+             Result := DD98_ReadADC( FADCChannelInputNumber[Channel],
+                                     FADCVoltageRanges[FADCVoltageRangeIndex]) ;
              end ;
           end ;
        CED1401_12, CED1401_16, CED1401_10V : begin
-          Result := CED_ReadADC( Channel ) ;
+          Result := CED_ReadADC( FADCChannelInputNumber[Channel] ) ;
           end ;
        Digidata132X : begin
-          Result := DD132X_ReadADC( Channel ) ;
+          Result := DD132X_ReadADC( FADCChannelInputNumber[Channel] ) ;
           end ;
 
        Instrutech : begin
-          Result := ITCMM_ReadADC( Channel ) ;
+          Result := ITCMM_ReadADC( FADCChannelInputNumber[Channel] ) ;
           end ;
 
        ITC_16, ITC_18 : begin
-          Result := ITC_ReadADC( Channel,
+          Result := ITC_ReadADC( FADCChannelInputNumber[Channel],
                                  FADCVoltageRanges[FADCVoltageRangeIndex]) ;
           end ;
        VP500 : begin
@@ -2056,11 +2070,11 @@ begin
           end ;
 
        Digidata1440 : begin
-          Result := DD1440_ReadADC( Channel ) ;
+          Result := DD1440_ReadADC( FADCChannelInputNumber[Channel] ) ;
           end ;
 
        Triton : begin
-          Result := Triton_ReadADC( Channel ) ;
+          Result := Triton_ReadADC( FADCChannelInputNumber[Channel] ) ;
           end ;
 
        WirelessEEG : begin
@@ -2796,9 +2810,8 @@ procedure TSESLabIO.SetADCChannelName( Chan : Integer ; Value : String ) ;
 // Set A/D channel Name
 // ---------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       FADCChannelName[Chan] := Value ;
-       end ;
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    FADCChannelName[Chan] := Value ;
     end ;
 
 
@@ -2807,9 +2820,8 @@ procedure TSESLabIO.SetADCChannelUnits( Chan : Integer ; Value : String ) ;
 // Set A/D channel units
 // ---------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       FADCChannelUnits[Chan] := Value ;
-       end ;
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    FADCChannelUnits[Chan] := Value ;
     end ;
 
 
@@ -2818,12 +2830,17 @@ procedure TSESLabIO.SetADCChannelVoltsPerUnits( Chan : Integer ; Value : Single 
 // Set A/D channel Volts per unit
 // ------------------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       if Value = 0.0 then Value := 1.0 ;
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    if Value = 0.0 then Value := 1.0 ;
+    if Abs(FADCChannelGain[Chan]) < 1E-10 then FADCChannelGain[Chan] := 1.0 ;
+    if FADCMaxValue = 0 then FADCMaxValue := 32767 ;
+
+    try
        FADCChannelVoltsPerUnits[Chan] := Value ;
-       FADCChannelUnitsPerBit[Chan] :=
-            FADCChannelVoltageRanges[Chan] /
+       FADCChannelUnitsPerBit[Chan] := FADCChannelVoltageRanges[Chan] /
             (FADCChannelVoltsPerUnits[Chan]*FADCChannelGain[Chan]*(FADCMaxValue+1)) ;
+    except
+       FADCChannelUnitsPerBit[Chan] := 1.0 ;
        end ;
     end ;
 
@@ -2833,15 +2850,18 @@ procedure TSESLabIO.SetADCChannelGain( Chan : Integer ; Value : Single ) ;
 // Set A/D channel gain
 // ---------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       if Value = 0.0 then Value := 1.0 ;
-       if Abs(FADCChannelGain[Chan]) < 1E-10 then FADCChannelGain[Chan] := 1.0 ;
-       if FADCMaxValue = 0 then FADCMaxValue := 2047 ;
-       FADCChannelGain[Chan] := Value ;
-       FADCChannelUnitsPerBit[Chan] :=
-            FADCChannelVoltageRanges[Chan] /
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    if Value = 0.0 then Value := 1.0 ;
+    if FADCMaxValue = 0 then FADCMaxValue := 32767 ;
+    FADCChannelGain[Chan] := Value ;
+
+    try
+       FADCChannelUnitsPerBit[Chan] := FADCChannelVoltageRanges[Chan] /
             (FADCChannelVoltsPerUnits[Chan]*FADCChannelGain[Chan]*(FADCMaxValue+1)) ;
+    except
+       FADCChannelUnitsPerBit[Chan] := 1.0 ;
        end ;
+
     end ;
 
 
@@ -2850,9 +2870,8 @@ procedure TSESLabIO.SetADCChannelZero( Chan : Integer ; Value : Integer ) ;
 // Set A/D channel zero level
 // --------------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       FADCChannelZero[Chan] := Value ;
-       end ;
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    FADCChannelZero[Chan] := Value ;
     end ;
 
 
@@ -2861,9 +2880,8 @@ procedure TSESLabIO.SetADCChannelZeroAt( Chan : Integer ; Value : Integer ) ;
 // Set A/D channel zero level
 // --------------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       FADCChannelZeroAt[Chan] := Value ;
-       end ;
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    FADCChannelZeroAt[Chan] := Value ;
     end ;
 
 
@@ -2872,12 +2890,16 @@ procedure TSESLabIO.SetADCChannelUnitsPerBit( Chan : Integer ; Value : Single ) 
 // Set A/D channel units per bit
 // -----------------------------
 begin
-    if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-       FADCChannelUnitsPerBit[Chan] := Value ;
-       FADCChannelVoltsPerUnits[Chan] :=
-            FADCChannelVoltageRanges[Chan] /
+    if (Chan < 0) or (Chan >= MaxADCChannels) then Exit ;
+    FADCChannelUnitsPerBit[Chan] := Value ;
+
+    try
+      FADCChannelVoltsPerUnits[Chan] := FADCChannelVoltageRanges[Chan] /
             (FADCChannelUnitsPerBit[Chan]*FADCChannelGain[Chan]*(FADCMaxValue+1)) ;
+    except
+       FADCChannelVoltsPerUnits[Chan] := 1.0 ;
        end ;
+
     end ;
 
 
@@ -2921,11 +2943,7 @@ procedure TSESLabIO.SetADCChannelInputNumber( Chan : Integer ; Value : Integer )
 begin
 
      if (Chan >= 0) and (Chan < MaxADCChannels) then begin
-        case FLabInterfaceType of
-            NationalInstruments,NIDAQMX : FADCChannelInputNumber[Chan] :=
-                                            Max(Min(FADCMaxChannels-1,Value),0) ;
-            else FADCChannelInputNumber[Chan] := Chan ;
-            end ;
+        FADCChannelInputNumber[Chan] := Value ;
         end ;
 
     end ;
@@ -2998,13 +3016,7 @@ begin
           CED_CheckSamplingInterval(FDACUpdateInterval,PreScale,ClockTicks,'H');
           end ;
        Digidata132X : begin
-          FDACUpdateInterval := FADCSamplingInterval ;
-          if FStimulusDigitalEnabled then begin
-             FDACUpdateInterval := (FADCSamplingInterval*(FDACNumChannels+1))/FADCNumChannels ;
-             end
-          else begin
-             FDACUpdateInterval := (FADCSamplingInterval*FDACNumChannels)/FADCNumChannels ;
-             end ;
+          FDACUpdateInterval := DD132X_GetDACUpdateInterval ;
           end ;
        Instrutech : begin
           FDACUpdateInterval := FADCSamplingInterval ;

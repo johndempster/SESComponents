@@ -50,7 +50,6 @@ unit SESCam;
  30/07/12 .... JD IMAQDX_SetVideoMode removed from SetCameraADC to avoid frame size being set
                   incorrectly on program start for IMAQdx cameras
  02/05/13 .... JD Andor SDK3 camera support added
- 16.08.13 .... JD Andor SDK2 Readout preamp gain and vertical shift speed can now be set by user
 
   ================================================================================ }
 {$OPTIMIZATION OFF}

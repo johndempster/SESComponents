@@ -1163,7 +1163,6 @@ begin
 
      ReadInt( Header, 'NBPP=', FNumBytesPerPixel ) ;
      ReadInt( Header, 'NF=', FNumFrames ) ;
-     //FNumFrames := 1125 ;
 
      ReadInt(Header, 'ZNUMS=',FNumZSections) ;
      FNumZSections := Max(FNumZSections,1) ;

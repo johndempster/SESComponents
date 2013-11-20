@@ -3616,6 +3616,8 @@ C7	 CONTINUE
 	 RETURN}
          end ;
 
+procedure InvertMatrix( A :
+
 procedure MINV(
           var A : Array of Single ;
           N : LongInt ;

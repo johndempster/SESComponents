@@ -24,7 +24,6 @@ unit pvcam;
 //             account for post-exposure readout in camera which do not support
 //             overlap readout mode. Post exposure readout enabled by
 //             PostExposureReadout = TRUE in StartCapture
-// 07.08.13 Error message removed from StopCapture because of persistent error with Cascade 512 under Windows 7
 //
 
 {OPTIMIZATION OFF}
@@ -1591,9 +1590,7 @@ begin
 
     // Stop continuous capture
     pl_exp_stop_cont( Session.Handle, 0 ) ;
-    // PVCAM_DisplayErrorMessage( 'pl_exp_stop_cont' ) ;
-    // Temporary workaround
-    // Error message removed because of persistent error with Cascade 512 under Windows 7
+    PVCAM_DisplayErrorMessage( 'pl_exp_stop_cont' ) ;
 
     // Uninitialise frame sequence system
     pl_exp_uninit_seq ;

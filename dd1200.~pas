@@ -82,10 +82,8 @@ type
             var dt : Double ;
             ADCVoltageRange : Single ;
             TriggerMode : Integer ;
-            CircularBuffer : Boolean ;
-            ADCChannelInputMap : Array of Integer   // Physical A/D input channel map
+            CircularBuffer : Boolean
             ) : Boolean ;
-            
   function DD_StopADC : Boolean ;
   procedure DD_GetADCSamples (
             var OutBuf : Array of SmallInt ;
@@ -740,8 +738,7 @@ function DD_ADCToMemory(
           var dt : Double ;                       { Sampling interval (s) (IN) }
           ADCVoltageRange : Single ;              { A/D input voltage range (V) (IN) }
           TriggerMode : Integer ;                 { Trigger Mode (IN) }
-          CircularBuffer : Boolean ;               { Repeated sampling into buffer (IN) }
-          ADCChannelInputMap : Array of Integer   // Physical A/D input channel map
+          CircularBuffer : Boolean                { Repeated sampling into buffer (IN) }
           ) : Boolean ;                           { Returns TRUE indicating A/D started }
 { -----------------------------
   Start A/D converter sampling
@@ -802,7 +799,7 @@ begin
      SetPortWord( DevH, IOPorts.Control, ControlWord ) ;
 
      for ch := 0 to nChannels-1 do begin
-         ChannelBits := ch or ($100*ADCChannelInputMap[ch]) or (GainBits*$2000) ;
+         ChannelBits := ch or ($100*ch) or (GainBits*$2000) ;
          if ch = (nChannels-1) then ChannelBits := ChannelBits or $8000 ;
          SetPortWord( DevH, IOPorts.ADCScanList, ChannelBits ) ;
          end ;
@@ -1211,7 +1208,6 @@ function DD_ReadADC(
 var
    i,OutPointer : Integer ;
    ADC : Array[0..MaxChannel] of SmallInt ;
-   ADCChannelMap : Array[0..MaxChannel] of Integer ;
    SamplingInterval : Double ;
 begin
      Result := 0 ;
@@ -1229,9 +1225,6 @@ begin
      // Fill buffer with empty flags
      for i := 0 to MaxChannel do ADC[i] := EmptyFlag ;
 
-     // Set A/D physical channel mapping
-     for i := 0 to MaxChannel do ADCChannelMap[i] := i ;
-
      // Sample all channels as fast as possible
      SamplingInterval := 1E-5*(MaxChannel+1) ;
      DD_ADCToMemory( ADC,
@@ -1240,8 +1233,7 @@ begin
                      SamplingInterval,
                      ADCVoltageRange,
                      tmFreeRun,
-                     False,
-                     ADCChannelMap) ;
+                     False ) ;
 
      // Loop until all samples acquired
      while ADC[MaxChannel] = EmptyFlag do DD_GetADCSamples( ADC, OutPointer ) ;

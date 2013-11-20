@@ -749,7 +749,6 @@ begin
 
     AIBuf := Nil ;
     AOBuf := Nil ;
-    OutValues := Nil ;
 
     DeviceInitialised := True ;
 
@@ -1068,7 +1067,7 @@ var
     if DD1440_IsAcquiring then DD1440_StopAcquisition ;
 
     // Allocate internal output waveform buffer
-    if OutValues <> Nil then FreeMem(OutValues) ;
+    FreeMem(OutValues) ;
     NumOutPoints := NumDACPoints ;
     GetMem( OutValues, NumOutPoints*NumOutChannels*2 ) ;
 
@@ -1284,13 +1283,9 @@ begin
      // Free DLL libraries
      if LibraryHnd > 0 then FreeLibrary( LibraryHnd ) ;
 
-     if OutValues <> Nil then FreeMem( OutValues ) ;
-     OutValues := Nil ;
-     if AOBuf <> Nil then FreeMem( AOBuf ) ;
-     AOBuf := Nil ;
-     if AIBuf <> Nil then FreeMem( AIBuf ) ;
-     AIBuf := Nil ;
-
+     FreeMem( OutValues ) ;
+     FreeMem( AOBuf ) ;
+     FreeMem( AIBuf ) ;
      DeviceInitialised := False ;
      DACActive := False ;
      ADCActive := False ;

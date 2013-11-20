@@ -1221,7 +1221,7 @@ begin
      for i := 0 to NumAmps-1 do begin
          Andor_CheckError( 'GetAmpDesc',GetAmpDesc(i , cBuf, 79 )) ;
          Andor_CheckError( 'GetAmpMaxSpeed',GetAmpMaxSpeed(i , AmpMaxSpeed )) ;
-         s := s + format('%s ',[string(cBuf)]) ;
+         s := s + format('%d= %s ',[i,string(cBuf)]) ;
          end ;
      CameraInfo.Add(s) ;
 
@@ -1235,7 +1235,7 @@ begin
          Andor_CheckError( 'GetHSSpeed',
                            GetHSSpeed( Session.ADChannel, 1, i, ReadoutRate )) ;
          if i > 0 then s := s + ', ' ;
-         s := s + format('%.4g MHz',[ReadoutRate] ) ;
+         s := s + format('%d=%.4g MHz',[i,ReadoutRate] ) ;
          end ;
      CameraInfo.Add(s) ;
 
@@ -1246,7 +1246,7 @@ begin
          Andor_CheckError( 'GetHSSpeed',
                            GetHSSpeed( Session.ADChannel, 0, i, ReadoutRate )) ;
          if i > 0 then s := s + ', ' ;
-         s := s + format('%.4g MHz',[ReadoutRate] ) ;
+         s := s + format('%d=%.4g MHz',[i,ReadoutRate] ) ;
          end ;
      CameraInfo.Add(s) ;
 

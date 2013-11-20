@@ -610,22 +610,32 @@ begin
 	 ii := 0;
 		  // add the string to trace to the command list
 	 while ii < Count do begin
-		  StrLCopy(@Token[0], @Str[1+ii], 4);
-		  Param1 := integer(Token);
+		  StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+		  Param1 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
 		  ii := ii + 4;
 		  if ii >= Count then begin
 				AddItem(Param1, 0, 0);
             exit;
             end;
-        StrLCopy(@Token[0], @Str[1+ii], 4);
-        Param2 := integer(Token);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param2 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
+
         ii := ii + 4;
         if ii >= Count then begin
             AddItem(Param1, Param2, 0);
             exit;
             end;
-        StrLCopy(@Token[0], @Str[1+ii], 4);
-        Param3 := integer(Token);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param3 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
         ii := ii + 4;
         AddItem(Param1, Param2, Param3);
         end;
@@ -661,22 +671,34 @@ begin
 	 ii := 0;
 		  // add the string to the command list
 	 while ii < Count do begin
-		  StrLCopy(@Token[0], @Str[1+ii], 4);
-		  Param1 := integer(Token);
+		  //StrLCopy(@Token[0], @Str[1+ii], 4);
+      StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+      Param1 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
 		  ii := ii + 4;
 		  if ii >= Count then begin
 				AddItem(Param1, 0, 0);
 				exit;
 				end;
-		  StrLCopy(@Token[0], @Str[1+ii], 4);
-		  Param2 := integer(Token);
+		  //StrLCopy(@Token[0], @Str[1+ii], 4);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param2 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
 		  ii := ii + 4;
 		  if ii >= Count then begin
 				AddItem(Param1, Param2, 0);
 				exit;
 				end;
-		  StrLCopy(@Token[0], @Str[1+ii], 4);
-		  Param3 := integer(Token);
+		  //StrLCopy(@Token[0], @Str[1+ii], 4);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param3 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
 		  ii := ii + 4;
 		  AddItem(Param1, Param2, Param3);
 		  end;
@@ -710,22 +732,40 @@ begin
 	 ii := 0;
 		  // add the string to the command list
 	 while ii < Count do begin
-        StrLCopy(@Token[0], @Str[1+ii], 4);
-        Param1 := integer(Token);
+        //StrLCopy(@Token[0], @Str[1+ii], 4);
+        //Param1 := integer(Token);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param1 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
+
         ii := ii + 4;
         if ii >= Count then begin
             AddItem(Param1, 0, 0);
             exit;
             end;
-        StrLCopy(@Token[0], @Str[1+ii], 4);
-        Param2 := integer(Token);
+        //StrLCopy(@Token[0], @Str[1+ii], 4);
+        //Param2 := integer(Token);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param2 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
+
         ii := ii + 4;
         if ii >= Count then begin
             AddItem(Param1, Param2, 0);
             exit;
             end;
-        StrLCopy(@Token[0], @Str[1+ii], 4);
-        Param3 := integer(Token);
+        //StrLCopy(@Token[0], @Str[1+ii], 4);
+        //Param3 := integer(Token);
+        StrLCopy(PAnsiChar(@Token[0]), PAnsiChar(@Str[1+ii]), 4);
+        Param3 := byte(Token[0]) or
+                (byte(Token[1]) shl 8) or
+                (byte(Token[2]) shl 16) or
+                (byte(Token[3]) shl 24) ;
+
         ii := ii + 4;
         AddItem(Param1, Param2, Param3);
         end;

@@ -2652,7 +2652,7 @@ var
 begin
      P := GetProcAddress(Hnd,PChar(Name)) ;
      if P = Nil then begin
-        //ShowMessage(format('nimcaiu.dll- %s not found',[Name])) ;
+        ShowMessage(format('nimcaiu.dll- %s not found',[Name])) ;
         end ;
      Result := P ;
      end ;

@@ -74,7 +74,6 @@ unit Ced1401;
                to avoid data being scrambled in long records at high sampling rates
                TEMPORARY FIX CED Power 1401 Mk3 No. of D/A channels limited to 2 since channels
                get scrambled (AO0 appearing on AO1 AO3 on AO0) when 4 channels used.
-   06.11.13    A/D input channels can now be mapped to different physical inputs
 
 }
 interface
@@ -111,8 +110,7 @@ const
             ADCVoltageRange : Single ;
             TriggerMode : Integer ;
             ADCExternalTriggerActiveHigh : Boolean ;
-            CircularBuffer : Boolean ;
-            ADCChannelInputMap : Array of Integer
+            CircularBuffer : Boolean
             ) : Boolean ;
 
 procedure CED_GetADCSamples(
@@ -731,8 +729,7 @@ function CED_ADCToMemory(
           ADCVoltageRange : Single ;              { A/D input voltage range (V) (IN) }
           TriggerMode : Integer ;                 // Trigger mode
           ADCExternalTriggerActiveHigh : Boolean ; { TRUE = Active High ext. trigger}
-          CircularBuffer : Boolean ;               { Repeated sampling into buffer (IN) }
-          ADCChannelInputMap : Array of Integer
+          CircularBuffer : Boolean                { Repeated sampling into buffer (IN) }
            ) : Boolean ;                          { Returns TRUE indicating A/D started }
 { -------------------------------
   Set up an A/D conversion sweeep
@@ -805,7 +802,7 @@ begin
 
      { Add channel list }
      for ch := 0 to nChannels-1 do
-         CommandString := CommandString + format('%d ',[ADCChannelInputMap[ch]]);
+         CommandString := CommandString + format('%d ',[ch]);
 
      // Start indefinite repeated sampling into circular buffer
      CommandString := CommandString + ',0,' ;
