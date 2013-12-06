@@ -30,6 +30,8 @@ unit Dd1320;
   18.11.11 Buffer size increased from 65536 to 1048576
   06.11.13 A/D input channels can now be mapped to different physical inputs
   18.11.13 MemoryToDACAndDigital now works in circular buffer mode
+  02.12.13 MemoryToDACAndDigital now works with very large (150s/12Msamples) buffers
+           Digital update interval now correct
   =================================================================}
 
 interface
@@ -368,6 +370,7 @@ var
    AOBuf : PSmallIntArray ;
    AOPointer : Integer ;
    AOBufNumSamples : Integer ;        // Output buffer size (no. samples)
+   AONumSamplesOutput : Integer ;
    DACDefaultValue : Array[0..DD132X_MAX_AO_CHANNELS-1] of SmallInt ;
    DIGDefaultValue : Integer ;
 
@@ -664,8 +667,7 @@ function DD132X_ADCToMemory(
   -----------------------------}
 
 var
-//   OK : Boolean ;
-   i,j,k,iPointer,iFlagPointer, iPrev,iNext : Integer ;
+   i,iPointer,iFlagPointer, iPrev,iNext : Integer ;
    NumSamplesPerSubBuf : Integer ;
    ch : Integer ;
 begin
@@ -717,7 +719,6 @@ begin
      iPointer := Cardinal(AIBuf) ;
      iFlagPointer := Cardinal(AIFlags) ;
      Protocol.uAIBuffers := Min( AIBufNumSamples div NumSamplesPerSubBuf, High(AIBufs)+1 );
-     k := 0 ;
      for i := 0 to Protocol.uAIBuffers-1 do begin
         AIBufs[i].pnData := Pointer(iPointer) ;
         AIBufs[i].uNumSamples := NumSamplesPerSubBuf ;
@@ -780,8 +781,8 @@ begin
 
         // Allocate internal output waveform buffer
         if OutValues <> Nil then FreeMem(OutValues) ;
-        NumOutPoints := 5000 ;
-        GetMem( OutValues, NumOutPoints*NumOutChannels*2 ) ;
+        NumOutPoints := 5000*NumOutChannels ;
+        GetMem( OutValues, NumOutPoints*2 ) ;
 
         // Clear any existing waveform from output buffer
         DD132X_FillOutputBufferWithDefaultValues ;
@@ -843,9 +844,7 @@ procedure DD132X_GetADCSamples(
           var OutBufPointer : Integer       { Latest sample pointer [OUT]}
           ) ;
 var
-    i,MaxOutPointer,NewPoints,NewSamples : Integer ;
-    NewAIPosition : Int64 ;
-    NewAOPosition : Integer ;
+    i,MaxOutPointer,NewPoints,NewSamples,NewAONumSamplesOutput,Err : Integer ;
 begin
 
      if not ADCActive then exit ;
@@ -888,11 +887,14 @@ begin
      OutBufPointer := FOutPointer ;
 
      // Update D/A + Dig output buffer
-     NewPoints := NewSamples div Protocol.uAIChannels ;
      if DACActive then begin
        // Copy into transfer buffer
-       MaxOutPointer := (NumOutPoints*NumOutChannels) - 1 ;
-       for i := 0 to NewPoints*NumOutChannels-1 do begin
+       DD132X_GetNumSamplesOutput( Device, NewAONumSamplesOutput, Err);
+       MaxOutPointer := NumOutPoints - 1 ;
+
+       NewPoints := NewAONumSamplesOutput - AONumSamplesOutput ;
+       AONumSamplesOutput :=  NewAONumSamplesOutput ;
+       for i := 0 to NewPoints{*NumOutChannels}-1 do begin
           AOBuf^[AOPointer] := OutValues^[OutPointer] ;
           Inc(AOPointer) ;
           if AOPointer >= AOBufNumSamples then AOPointer := 0 ;
@@ -938,7 +940,8 @@ function  DD132X_MemoryToDACAndDigitalOut(
   spurious digital O/P changes between records
   --------------------------------------------------------------}
 var
-   i,j,ch,iTo,iFrom,DigCh,MaxOutPointer : Integer ;
+   i,ch,iTo,iFrom,DigCh,MaxOutPointer : Integer ;
+   t,tstep : single ;
 begin
 
     Result := False ;
@@ -949,24 +952,32 @@ begin
     if DD132X_IsAcquiring(Device) then DD132X_StopAcquisition(Device,Err) ;
 
     // Allocate internal output waveform buffer
+    // Ensure buffer is a multiple of no. out channels
+    NumOutPoints := ((NumDACPoints*Protocol.uAIChannels) div NumOutChannels)*NumOutChannels ;
     if OutValues <> Nil then FreeMem(OutValues) ;
-    NumOutPoints := NumDACPoints ;
-    GetMem( OutValues, NumOutPoints*NumOutChannels*2 ) ;
+    GetMem( OutValues, NumOutPoints*2 ) ;
 
     // Copy D/A & digital values into internal buffer
     DigCh := NumOutChannels - 1 ;
-    for i := 0 to NumDACPoints-1 do begin
-        iTo := i*(NumOutChannels) ;
-        iFrom := i*NumDACChannels ;
-       for ch :=  0 to (DigCh-1) do begin
-            if ch < NumDACChannels then begin
-               OutValues[iTo+ch] := Round( DACValues[iFrom+ch]/CalibrationData.adDACGainRatio[ch])
-                                     - CalibrationData.anDACOffset[ch];
-               end
-            else OutValues[iTo+ch] := DACDefaultValue[ch] ;
-            end ;
-        if DigitalInUse then OutValues^[iTo+DigCh] := DigValues[i]
-                        else OutValues^[iTo+DigCh] := DIGDefaultValue ;
+    tStep := 1.0 / Protocol.uAIChannels ;
+    ch := 0 ;
+    for iTo := 0 to NumOutPoints-1 do begin
+        iFrom := Round(iTo*tStep) ;
+        if ch < NumDACChannels then begin
+           OutValues[iTo] := Round( DACValues[(iFrom*NumDACChannels)+ch]/CalibrationData.adDACGainRatio[ch])
+                                - CalibrationData.anDACOffset[ch];
+           end
+        else OutValues[iTo] := DACDefaultValue[ch] ;
+
+        if ch = DigCh then begin
+           if DigitalInUse then OutValues^[iTo] := DigValues[iFrom]
+                           else OutValues^[iTo] := DIGDefaultValue ;
+           end ;
+
+        Inc(ch) ;
+        if ch >= NumOutChannels then ch := 0 ;
+//        t := t + tStep ;
+
         end ;
 
     // Download protocol to DD132X and start/restart acquisition
@@ -979,7 +990,7 @@ begin
 
     // Fill buffer with data from new waveform
     OutPointer := 0 ;
-    MaxOutPointer := (NumOutPoints*NumOutChannels) - 1 ;
+    MaxOutPointer := NumOutPoints - 1 ;
     for i := 0 to AOBufNumSamples-1 do begin
         AOBuf^[i] := OutValues^[OutPointer] ;
         Inc(OutPointer) ;
@@ -1006,12 +1017,12 @@ begin
     // Start
     OK := DD132X_StartAcquisition( Device, Err ) ;
     if not OK then DD132X_CheckError(Err) ;
+    DD132X_GetNumSamplesOutput( Device, AONumSamplesOutput, Err);
 
     AIPointer := 0 ;
     AOPointer := 0 ;
 
     ADCActive := True ;
-
 
     AORepeatWaveform := RepeatWaveform ;
     DACActive := True ;
@@ -1026,7 +1037,7 @@ function DD132X_GetDACUpdateInterval : double ;
   Get D/A update interval
   -----------------------}
 begin
-     Result := (Protocol.SampleInterval*NumOutChannels)/SecsToMicrosecs ;
+     Result := (Protocol.SampleInterval*Protocol.uAIChannels)/SecsToMicrosecs ;
      { NOTE. DD132X interfaces only have one clock for both A/D and D/A
        timing. Thus DAC update interval is constrained to be the same
        as A/D sampling interval (set by DD132X_ADC_to_Memory_. }
@@ -1284,7 +1295,7 @@ begin
     // Output buffer
     ch := 0 ;
     DIGChannel := NumOutChannels - 1 ;
-    for i := 0 to NumOutPoints*NumOutChannels-1 do begin
+    for i := 0 to NumOutPoints-1 do begin
         if ch < DIGChannel then begin
            OutValues^[i] := DACDefaultValue[ch] ;
            inc(ch) ;

@@ -111,7 +111,8 @@ unit SESLabIO;
   07.06.13 Invalid out of range channel scaling factors prevented from cause FP errors
   06.11.13 A/D input channels can now be mapped to different physical inputs
            for CED 1401s, Digidatas 1320 and 1440 and ITC-16 and ITC-18
-  18.11.13 ... Stimulus support for Digidata 132X added         
+  18.11.13 ... Stimulus support for Digidata 132X added
+  02.12.13 ... Long stimuli now work correctly with Digidata 132X 
   ================================================================================ }
 
 interface
@@ -3016,7 +3017,7 @@ begin
           CED_CheckSamplingInterval(FDACUpdateInterval,PreScale,ClockTicks,'H');
           end ;
        Digidata132X : begin
-          FDACUpdateInterval := DD132X_GetDACUpdateInterval ;
+          FDACUpdateInterval := FADCSamplingInterval ;
           end ;
        Instrutech : begin
           FDACUpdateInterval := FADCSamplingInterval ;

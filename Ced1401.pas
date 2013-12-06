@@ -75,6 +75,8 @@ unit Ced1401;
                TEMPORARY FIX CED Power 1401 Mk3 No. of D/A channels limited to 2 since channels
                get scrambled (AO0 appearing on AO1 AO3 on AO0) when 4 channels used.
    06.11.13    A/D input channels can now be mapped to different physical inputs
+ 28/11/13 ...  DACPointsInBlock now adjusted to ensure at least 3 buffers in 1401 DAC buffer
+               to fix problems with CED 1401-plus. CED 1401-plus buffer sizes changed DAC buffer increased
 
 }
 interface
@@ -217,7 +219,7 @@ type
                                 sMaxLongs:SmallInt):SmallInt;stdcall;
     TU14ToHost = FUNCTION (hand:SmallInt;lpAddrHost:PANSIChar;dwSize:DWORD;
                     lAddr1401:LongInt;eSz:SmallInt):SmallInt;stdcall;
-    TU14To1401 = FUNCTION (hand:SmallInt;lpAddrHost:PANSIChar;dwSize:DWORD;
+    TU14To1401 = FUNCTION (hand:SmallInt;lpAddrHost:Pointer;dwSize:DWORD;
                     lAddr1401:LongInt;eSz:SmallInt):SmallInt;stdcall;
     TU14sendstring = FUNCTION (hand:SmallInt;PCharing:PANSIChar):SmallInt; stdcall;
     TU14KillIO1401 = FUNCTION(hand:SmallInt):SmallInt; stdcall;
@@ -427,10 +429,10 @@ begin
                 DACMaxChannels := 4;
                 ADCMinSamplingInterval := 5E-6 ;
                 ADCMaxSamplingInterval := 1000.0 ;
-                DACMinUpdateInterval := 1E-4 ;
+                DACMinUpdateInterval := 2E-4 ;
                 ADC1401BufferSize := 16000 ;//65536 ;
-                DAC1401BufferSize := ADC1401BufferSize div 3 ;
-                MaxDIGTIMSlices := Min(100,DIGTIMSlicesBufLimit) ;
+                DAC1401BufferSize := 14000 ; //ADC1401BufferSize div 2 ;
+                MaxDIGTIMSlices := Min(200,DIGTIMSlicesBufLimit) ;
                 ClockPeriod := 2.5E-7 ;
                 end ;
 
@@ -901,11 +903,11 @@ begin
         U14LongsFrom1401( Device, @Reply, High(Reply) ) ;
 
         DAC1401BlockInUse := Reply[0] div DACNumBytesInBlock ;
-        //outputdebugString(PChar(format('%d %d %d',[Reply[0],DAC1401BlockInUse,DAC1401BlockDone])));
+//        outputdebugString(PChar(format('%d %d %d',[Reply[0],DAC1401BlockInUse,DAC1401BlockDone])));
         while DAC1401BlockDone <> DAC1401BlockInUse do begin
            CED_WriteToDACBuffer ;
            Inc(DAC1401BlockDone) ;
-           if DAC1401BlockDone > DACNumBlocksIn1401Buf then DAC1401BlockDone := 0 ;
+           if DAC1401BlockDone >= DACNumBlocksIn1401Buf then DAC1401BlockDone := 0 ;
            end ;
         end ;
      end ;
@@ -996,7 +998,7 @@ begin
      DACRepeatedWaveform := DACRepeatedWaveformIn ;
      DACNumChannels := nChannels ;
      DACBufNumPoints := nPoints*nChannels ;
-     DACNumPointsInBlock := (MaxPointsinBlock div nChannels)*nChannels ;
+     DACNumPointsInBlock := (Min(MaxPointsinBlock,(DAC1401BufferSize div 4)) div nChannels)*nChannels ;
      DACNumBytesInBlock := DACNumPointsInBlock*2 ;
      DACNumBlocksIn1401Buf := DAC1401BufferSize div DACNumPointsInBlock ;
      DACNumPointsIn1401Buf := DACNumBlocksIn1401Buf*DACNumPointsInBlock ;
@@ -1012,7 +1014,13 @@ begin
      DACBufPointer := 0 ;
      DACNextBlockToWrite := 0 ;
      DAC1401BlockDone := 0 ;
-     CED_WriteToDACBuffer ;
+     //CED_WriteToDACBuffer ;
+
+     for i := 1 to 2 do begin
+           CED_WriteToDACBuffer ;
+           Inc(DAC1401BlockDone) ;
+           if DAC1401BlockDone > DACNumBlocksIn1401Buf then DAC1401BlockDone := 0 ;
+           end ;
 
      //outputdebugString(PChar(format('%d',[StartOf1401DACBuffer])));
 
@@ -1076,11 +1084,11 @@ procedure CED_WriteToDACBuffer ;
 // Write D/A to DAC buffer in 1401
 // -------------------------------
 var
-    i,iLastPoint,iStart : Integer ;
+    i : Integer ;
+    iStart : DWORD ;
 begin
 
      // Copy from DACBuf to IOBuf
-
      for i := 0 to DACNumPointsInBlock-1 do begin
         IOBuf^[i] := DACBuf^[DACBufPointer] ;
         Inc(DACBufPointer) ;
@@ -1091,12 +1099,12 @@ begin
                                   else DACBufPointer := DACBufNumPoints - DACNumChannels ;
            end ;
         end ;
-
+//     outputdebugString(PChar(format('%d %d %d',[DACNextBlockToWrite,DACBufPointer,DACBufNumPoints])));
      iStart := DACNextBlockToWrite*DACNumBytesInBlock ;
      U14To1401( Device,
-                PANSIChar(IOBuf),
+                IOBuf,
                 DACNumBytesinBlock,
-                StartOf1401DACBuffer + iStart, 1 ) ;
+                StartOf1401DACBuffer + iStart, 0 ) ;
      Inc(DACNextBlockToWrite) ;
      if DACNextBlockToWrite >= DACNumBlocksIn1401Buf then DACNextBlockToWrite := 0 ;
 
@@ -1468,6 +1476,11 @@ begin
      if IOBuf <> Nil then begin
         Dispose(IOBuf) ;
         IOBuf := Nil ;
+        end ;
+
+     if DACBuf <> Nil then begin
+        Dispose(DACBuf) ;
+        DACBuf := Nil ;
         end ;
 
      end ;
