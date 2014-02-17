@@ -112,7 +112,12 @@ unit SESLabIO;
   06.11.13 A/D input channels can now be mapped to different physical inputs
            for CED 1401s, Digidatas 1320 and 1440 and ITC-16 and ITC-18
   18.11.13 ... Stimulus support for Digidata 132X added
+<<<<<<< HEAD
   02.12.13 ... Long stimuli now work correctly with Digidata 132X 
+=======
+  02.12.13 ... Long stimuli now work correctly with Digidata 132X
+  14.02.14 ...  MaxADCSamples doubled to 16Msamples
+>>>>>>> A/D sample buffer increased to 16Msamples
   ================================================================================ }
 
 interface
@@ -124,7 +129,7 @@ uses
 const
      MaxDevices = 5 ;
      //MaxADCSamples = 131072 ;
-     MaxADCSamples = 1048576*8 ;
+     MaxADCSamples = 1048576*16 ;//1048576*8 ; Double to 16Msamples 14-2-14
      MaxADCChannels = 128 ;
      MaxDACChannels = 128 ;
      MaxADCVoltageRanges = 20 ;
