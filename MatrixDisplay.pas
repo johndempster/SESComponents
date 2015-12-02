@@ -4,6 +4,9 @@ unit MatrixDisplay;
 // -----------------------------------
 // 19.10.12
 // 11.07.13
+// 05.02.14 .SkipPoints property added
+// 08.02.14 Vertical calibration bar size now indicated on channels with scaling factors
+//          which differ from Ch.1 
 
 interface
 
@@ -81,6 +84,7 @@ type
     FNumRows : Integer ;       // No. of rows in display grid    
     FNumPoints : Integer ;     // No. of points displayed
     FMaxPoints : Integer ;     // Max. display points allowed
+    FSkipPoints : Integer ;    // No. of points to skip in displayed line
     FXMin : Integer ;          // Index of first sample in buffer on display
     FXMax : Integer ;          // Index of last sample in buffer on display
     FXOffset : Integer ;       // User-settable offset added to sample index numbers
@@ -457,6 +461,7 @@ type
              read FDisplaySelected write FDisplaySelected ;
     property FontSize : Integer
              read FFontSize write FFontSize ;
+    property SkipPoints : Integer read FSkipPoints write FSkipPoints ;
   end;
 
 procedure Register;
@@ -604,6 +609,8 @@ begin
     FMarkerText := TStringList.Create ;
 
     FDisplaySelected := False ;
+
+    FSkipPoints := 1 ;
 
     ZoomRectCount := 0 ;
     NumZoomButtons := 0 ;
@@ -814,7 +821,7 @@ procedure TMatrixDisplay.PlotRecord(
   Plot a signal record on to a canvas
   ----------------------------------- }
 var
-   ch,n,i,j : Integer ;
+   ch,n,i,j,iMax : Integer ;
    y : single ;
 begin
 
@@ -825,7 +832,12 @@ begin
      for ch := 0 to FNumChannels-1 do if Channels[ch].InUse then begin
          Canv.Pen.Color := Channels[ch].Color ;
          n := 0 ;
-         for i := Round(FXMin) to Min(Round(FXMax),FNumPoints-1) do begin
+//         for i := Round(FXMin) to Min(Round(FXMax),FNumPoints-1) do begin
+         i := Round(FXMin) ;
+         iMax := Min(Round(FXMax),FNumPoints-1) ;
+         FSkipPoints := Max(FSkipPoints,1) ;
+
+         while i < iMax do begin
 
              j := (i*FNumChannels) + Channels[ch].ADCOffset ;
              if FNumBytesPerSample > 2 then y := PIntArray(FBuf)^[j]
@@ -841,6 +853,8 @@ begin
                 xy[0] := xy[n-1] ;
                 n := 1 ;
                 end ;
+
+             i := i + FSkipPoints ;
 
              end ;
          Polyline( Canv.Handle, xy, n ) ;
@@ -894,6 +908,8 @@ var
    iRow,iCol : Integer ;
    xMid,yMid : Integer ;
    EndTickSize : Integer ;
+   YTickSizeChannel : Single ;
+   Units : string ;
 begin
 
      FNumRows := FNumChannels div FNumColumns ;
@@ -1063,7 +1079,16 @@ begin
                        s) ;
 
          if Channel[ch].ADCScale <> Channel[0].ADCScale then begin
-            s := format('X%.3g',[Channel[0].ADCScale/Channel[ch].ADCScale]) ;
+            YTickSizeChannel := YTickSize/(Channel[0].ADCScale/Channel[ch].ADCScale) ;
+            Units := Channel[ch].ADCUnits ;
+            while YTickSizeChannel > 999.0 do begin
+                YTickSizeChannel := YTickSizeChannel*0.001 ;
+                if Units = 'uV' then Units := 'mV'
+                else if Units = 'mV' then Units := 'V'
+                else if Units = 'uA' then Units := 'mA'
+                else if Units = 'mA' then Units := 'A'
+                end ;
+            s := format('%.3g%s',[YTickSizeChannel,Units]);
             Canv.TextOut( Max(Channel[ch].Left - Canv.TextWidth(s+'x') - 1,0),
                           YMid,
                           s) ;
@@ -1166,7 +1191,7 @@ procedure TMatrixDisplay.DisplayNewPoints(
   Plot a new block of A/D samples of display
   -----------------------------------------}
 var
-   i,j,ch : Integer ;
+   i,j,ch,iMax : Integer ;
    StartAt,EndAt,XPix : Integer ;
    y : single ;
 begin
@@ -1186,7 +1211,11 @@ begin
          XPix := Max( XToCanvasCoord( Channel[ch], StartAt ), Channel[ch].Left ) ;
          Canvas.MoveTo( XPix,YToCanvasCoord( Channel[ch], y) ) ;
 
-         for i := StartAt to EndAt do begin
+//         for i := StartAt to EndAt do begin
+         i := StartAt ;
+         iMax := EndAt ;
+         FSkipPoints := Max(FSkipPoints,1) ;
+         while i < iMax do begin
              j := (i*FNumChannels) + Channel[ch].ADCOffset ;
              if FNumBytesPerSample > 2 then y := PIntArray(FBuf)^[j]
                                        else y := PSmallIntArray(FBuf)^[j] ;
@@ -1194,6 +1223,7 @@ begin
              if (XPix >= Channel[ch].Left) and (XPix <= Channel[ch].Right) then begin
                 Canvas.LineTo( XPix, YToCanvasCoord( Channel[ch], y) ) ;
                 end ;
+            i := i + FSkipPoints ;
             end ;
          end ;
 
@@ -2952,6 +2982,8 @@ var
    yRange,dy,dx,XRange : Double ;
    TopEdge,RightEdge,LeftEdge,BottomEdge : Integer ;
    EndTickSize : Integer ;
+   YTickSizeChannel : Single ;
+   Units : String ;
 begin
      { Create plotting points array }
      New(xy) ;
@@ -3018,7 +3050,16 @@ begin
                        s) ;
 
          if PrChan[ch].ADCScale <> PrChan[0].ADCScale then begin
-            s := format('X%.2g',[PrChan[0].ADCScale/PrChan[ch].ADCScale]) ;
+            YTickSizeChannel := YTickSize/(PrChan[0].ADCScale/PrChan[ch].ADCScale) ;
+            Units := PrChan[ch].ADCUnits ;
+            while YTickSizeChannel > 999.0 do begin
+                YTickSizeChannel := YTickSizeChannel*0.001 ;
+                if Units = 'uV' then Units := 'mV'
+                else if Units = 'mV' then Units := 'V'
+                else if Units = 'uA' then Units := 'mA'
+                else if Units = 'mA' then Units := 'A'
+                end ;
+            s := format('%.3g%s',[YTickSizeChannel,Units]);
             Printer.Canvas.TextOut( Max(PrChan[ch].Left - Printer.Canvas.TextWidth(s+'x') - 1,0),YMid,s) ;
             end ;
 
@@ -3154,6 +3195,8 @@ var
    yRange,dy,dx,XRange : Double ;
    TopEdge,RightEdge,LeftEdge,BottomEdge,ChannelNameSpace : Integer ;
    EndTickSize : Integer ;
+   YTickSizeChannel : Single ;
+   Units : String ;
 begin
 
      { Create plotting points array }
@@ -3235,7 +3278,16 @@ begin
                        s) ;
 
          if MFChan[ch].ADCScale <> MFChan[0].ADCScale then begin
-            s := format('X%.2g',[MFChan[0].ADCScale/MFChan[ch].ADCScale]) ;
+            YTickSizeChannel := YTickSize/(MFChan[0].ADCScale/MFChan[ch].ADCScale) ;
+            Units := MFChan[ch].ADCUnits ;
+            while YTickSizeChannel > 999.0 do begin
+                YTickSizeChannel := YTickSizeChannel*0.001 ;
+                if Units = 'uV' then Units := 'mV'
+                else if Units = 'mV' then Units := 'V'
+                else if Units = 'uA' then Units := 'mA'
+                else if Units = 'mA' then Units := 'A'
+                end ;
+            s := format('%.3g%s',[YTickSizeChannel,Units]);
             TMFC.TextOut( Max(MFChan[ch].Left - TMFC.TextWidth(s+'x') - 1,0),YMid,s) ;
             end ;
 
