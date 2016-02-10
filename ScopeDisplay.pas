@@ -242,6 +242,7 @@ type
     //Display settings
     FGridColor : TColor ;         // Calibration grid colour
     FTraceColor : TColor ;        // Trace colour
+    FPreviousTraceColor: TColor;  // Color of previous traces left on display
     FBackgroundColor : TColor ;   // Background colour
     FCursorColor : TColor ;       // Cursors colour
     FNonZeroHorizontalCursorColor : TColor ; // Cursor colour
@@ -268,6 +269,8 @@ type
     ZoomButtonList : Array[0..100] of TScopeDisplayZoomButtonList ;
     NumZoomButtons : Integer ;
 
+    LastLastActiveChannel: Integer; // For OverlayTraces, to redraw x axis
+                                    // when recording signals
     { -- Property read/write methods -------------- }
 
     procedure SetNumChannels(Value : Integer ) ;
@@ -466,6 +469,9 @@ type
              read GetHorCursor write SetHorCursor ;
     property VerticalCursors[ i : Integer ] : Integer
              read GetVertCursor write SetVertCursor ;
+    function GetTraceColor: TColor;
+    function GetPreviousTraceColor: TColor;
+    procedure RedrawXAxis;
 
   published
     { Published declarations }
@@ -606,6 +612,7 @@ begin
 
      FGridColor := clLtGray ;
      FTraceColor := clBlue ;
+     FPreviousTraceColor := clAqua;
      FBackgroundColor := clWhite ;
      FCursorColor := clNavy ;
      FNonZeroHorizontalCursorColor := clRed ;
@@ -1041,6 +1048,7 @@ begin
 
          end ;
 
+     LastLastActiveChannel := LastActiveChannel;
      // Display channel enabled buttons
      Canv.Pen.Color := clBlack ;
      for ch := 0 to FNumChannels-1 do if not FDisableChannelVisibilityButton then begin
@@ -4075,8 +4083,105 @@ begin
      Inc(ZoomRectCount) ;
      end ;
 
+function TScopeDisplay.GetTraceColor: TColor;
+begin
+  Result := FTraceColor;
+end;
+
+function TScopeDisplay.GetPreviousTraceColor: TColor;
+begin
+  Result := FPreviousTraceColor;
+end;
+
+procedure TScopeDisplay.RedrawXAxis;
+// To implement OverlayTraces feature together with RecADC time axis
+// displaying elapsed record time, x axis needs to be "manually" redrawn
+// (calling Invalidate prevents previous traces from being displayed, but
+// without Invalidate the x axis was not redrawn)
+const
+  TickSize = 4;
+  TickMultipliers: array[0..6] of Integer = (1,2,5,10,20,50,100) ;
+var
+  Canv: TCanvas;               // Canvas to be cleared
+  KeepColor: TColor;
+  LastActiveChannel: Integer;
+  XRange,XTick,XTickSize,XTickMin,XTickMax,XScaledMax,XScaledMin,dx: Single;
+  TickBase: Single;
+  i: Integer;
+  XAxisAt, xPix: Integer;
+  iTick, NumTicks: Integer;
+  s: String;
+begin
+  Canv := Canvas;
+  LastActiveChannel := LastLastActiveChannel;
+
+  // Draw vertical ticks/grid line
+  Canv.Font.Color := clBlack;
+
+  // Determine suitable calibration tick size
+  XScaledMin := (FXMin+FXOffset)*FTScale;
+  XScaledMax := (FXMax+FXOffset)*FTScale;
+  if XScaledMax = XScaledMin then
+    XScaledMax := XScaledMin + 1.0;
+
+  XRange := XScaledMax - XScaledMin;
+  TickBase := 0.01*exp(Round(Log10(Abs(xRange)))*ln(10.0));
+  for i := 0 to High(TickMultipliers) do
+  begin
+    XTickSize := TickBase*TickMultipliers[i];
+    if (XRange/XTickSize) <= 10 then
+      Break;
+  end;
+
+  // Find minimum & maximum Y tick
+  XTickMax := XTickSize*Floor(XScaledMax/XTickSize);
+  XTickMin := XTickSize*Ceil(XScaledMin/XTickSize);
+  NumTicks := Round((XTickMax - XTickMin)/XTickSize) + 1;
+
+  // Plot ticks
+  XTick := XTickMin;
+  iTick := 0;
+  dx := (Channel[0].Right - Channel[0].Left) / XRange;
+  XAxisAt := Channel[LastActiveChannel].Bottom + Canv.TextHeight('X') + 2;
+  KeepColor := Canv.Pen.Color;
+  Canv.Pen.Color := FBackgroundColor;
+  Canv.Rectangle(Channel[0].Left - 2 * Canv.TextWidth('m'),
+                 Channel[LastActiveChannel].Bottom + 2,
+                 Channel[0].Right + 2 * Canv.TextWidth('m'),
+                 Channel[LastActiveChannel].Bottom +
+                                     3 * Canv.TextHeight('X'));
+  Canv.Pen.Color := KeepColor;
+  while iTick < NumTicks do
+  begin
+
+    xPix := Round((XTick - XScaledMin)*dx) + Channel[0].Left;
+
+    Canv.Pen.Color := clBlack;
+
+    // X axis
+    Canv.MoveTo(Channel[0].Left, XAxisAt);
+    Canv.LineTo(Channel[0].Right, XAxisAt);
+
+    // Draw tick
+    Canv.MoveTo(xPix, XAxisAt);
+    Canv.LineTo(xPix, XAxisAt + TickSize);
+
+    // Display tick value
+
+    if iTick < (NumTicks-1) then
+      s := format('%.4g',[XTick])
+    else
+      s := format('%.4g %s',[XTick,FTUnits]);
+
+    Canv.TextOut(xPix - (Canv.TextWidth(s) div 2),
+                 XAxisAt + TickSize + 1,
+                 s);
+
+    XTick := XTick + XTickSize ;
+    Inc(iTick) ;
+  end;
+
+end;
 
 end.
-
-
 
